@@ -1,5 +1,6 @@
 package gc.grivyzom;
 
+import gc.grivyzom.database.DatabaseManager;
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.plugin.java.JavaPlugin;
@@ -37,7 +38,7 @@ public class grvTags extends JavaPlugin {
             loadConfigurations();
             sendColoredMessage(PREFIX + "&a✓ &7Configuraciones cargadas");
 
-            // Inicializar base de datos (placeholder para futuro desarrollo)
+            // Inicializar base de datos
             initializeDatabase();
             sendColoredMessage(PREFIX + "&a✓ &7Base de datos inicializada");
 
@@ -116,9 +117,20 @@ public class grvTags extends JavaPlugin {
      * Inicializa la conexión a la base de datos
      */
     private void initializeDatabase() {
-        // Placeholder para la inicialización de MySQL
-        // DatabaseManager.initialize(this);
-        getLogger().info("Sistema de base de datos inicializado");
+        try {
+            DatabaseManager.initialize(this);
+
+            // Probar la conexión
+            if (DatabaseManager.testConnection()) {
+                getLogger().info("Conexión a la base de datos verificada correctamente");
+            } else {
+                getLogger().severe("Error: No se pudo verificar la conexión a la base de datos");
+            }
+
+        } catch (Exception e) {
+            getLogger().severe("Error al inicializar la base de datos: " + e.getMessage());
+            throw e; // Re-lanzar la excepción para que se maneje en onEnable
+        }
     }
 
     /**
@@ -172,8 +184,7 @@ public class grvTags extends JavaPlugin {
      * Cierra las conexiones de base de datos
      */
     private void closeDatabase() {
-        // Placeholder para cerrar conexiones
-        // DatabaseManager.closeConnections();
+        DatabaseManager.disconnect();
         getLogger().info("Conexiones de base de datos cerradas");
     }
 
