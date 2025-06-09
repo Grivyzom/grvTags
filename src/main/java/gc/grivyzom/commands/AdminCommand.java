@@ -2,11 +2,14 @@ package gc.grivyzom.commands;
 
 import gc.grivyzom.database.DatabaseManager;
 import gc.grivyzom.grvTags;
+import gc.grivyzom.managers.CategoryManager;
+import gc.grivyzom.managers.TagManager;
 import org.bukkit.ChatColor;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
 import org.bukkit.command.TabCompleter;
+import org.bukkit.entity.Player;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -49,6 +52,15 @@ public class AdminCommand implements CommandExecutor, TabCompleter {
             case "database":
                 handleDatabase(sender);
                 break;
+            case "create":
+                handleCreate(sender, args);
+                break;
+            case "createcategory":
+                handleCreateCategory(sender, args);
+                break;
+            case "editor":
+                handleEditor(sender, args);
+                break;
             case "help":
                 showHelp(sender);
                 break;
@@ -84,9 +96,10 @@ public class AdminCommand implements CommandExecutor, TabCompleter {
                 sender.sendMessage(colorize(PREFIX + "&c✗ &7Error al reinicializar la base de datos"));
             }
 
-            // TODO: Recargar tags.yml y categories.yml cuando estén implementados
-            // TagManager.reloadTags();
-            // CategoryManager.reloadCategories();
+            // Recargar tags.yml y categories.yml
+            TagManager.loadAllTags();
+            CategoryManager.loadAllCategories();
+            sender.sendMessage(colorize(PREFIX + "&a✓ &7Tags y categorías recargados"));
 
             long endTime = System.currentTimeMillis();
             long reloadTime = endTime - startTime;
@@ -118,9 +131,9 @@ public class AdminCommand implements CommandExecutor, TabCompleter {
         sender.sendMessage(colorize("&7Estado de la base de datos: " +
                 (DatabaseManager.isConnected() ? "&a✓ Conectada" : "&c✗ Desconectada")));
 
-        // TODO: Añadir más información cuando esté disponible
-        // sender.sendMessage(colorize("&7Tags cargados: &f" + TagManager.getTagCount()));
-        // sender.sendMessage(colorize("&7Categorías cargadas: &f" + CategoryManager.getCategoryCount()));
+        // Información de managers
+        sender.sendMessage(colorize("&7Tags cargados: &f" + TagManager.getTagCount()));
+        sender.sendMessage(colorize("&7Categorías cargadas: &f" + CategoryManager.getCategoryCount()));
 
         sender.sendMessage(colorize("&8&m----------------------------------------"));
     }
@@ -151,7 +164,141 @@ public class AdminCommand implements CommandExecutor, TabCompleter {
     }
 
     /**
-     * Muestra la ayuda del comando
+     * Maneja el subcomando create para crear un nuevo tag
+     * Sintaxis: /grvtags create <nombre> <categoria>
+     */
+    private void handleCreate(CommandSender sender, String[] args) {
+        if (args.length < 3) {
+            sender.sendMessage(colorize(PREFIX + "&cUso incorrecto. Sintaxis:"));
+            sender.sendMessage(colorize(PREFIX + "&f/grvtags create <nombre> <categoria>"));
+            sender.sendMessage(colorize(PREFIX + "&7Ejemplo: &f/grvtags create VIP default"));
+            return;
+        }
+
+        String tagName = args[1];
+        String categoryName = args[2];
+
+        // Validar nombre del tag
+        if (!isValidTagName(tagName)) {
+            sender.sendMessage(colorize(PREFIX + "&cNombre de tag inválido. Solo se permiten letras, números y guiones bajos."));
+            return;
+        }
+
+        // Validar que la categoría existe
+        if (!CategoryManager.categoryExists(categoryName)) {
+            sender.sendMessage(colorize(PREFIX + "&cLa categoría '&f" + categoryName + "&c' no existe."));
+            sender.sendMessage(colorize(PREFIX + "&7Usa &f/grvtags createcategory " + categoryName + " &7para crearla primero."));
+            return;
+        }
+
+        // Verificar que el tag no existe
+        if (TagManager.tagExists(tagName)) {
+            sender.sendMessage(colorize(PREFIX + "&cEl tag '&f" + tagName + "&c' ya existe."));
+            return;
+        }
+
+        try {
+            // Crear el tag en la base de datos
+            if (TagManager.createTag(tagName, categoryName, null)) {
+                sender.sendMessage(colorize(PREFIX + "&a¡Tag '&f" + tagName + "&a' creado exitosamente!"));
+                sender.sendMessage(colorize(PREFIX + "&7Categoría: &f" + categoryName));
+                sender.sendMessage(colorize(PREFIX + "&7Usa &f/grvtags editor tag &7para configurar el tag."));
+
+                plugin.getLogger().info("Tag '" + tagName + "' creado por " + sender.getName() + " en categoría '" + categoryName + "'");
+            } else {
+                sender.sendMessage(colorize(PREFIX + "&c¡Error al crear el tag en la base de datos!"));
+            }
+        } catch (Exception e) {
+            sender.sendMessage(colorize(PREFIX + "&c¡Error al crear el tag!"));
+            sender.sendMessage(colorize(PREFIX + "&cError: &f" + e.getMessage()));
+            plugin.getLogger().severe("Error al crear tag '" + tagName + "': " + e.getMessage());
+        }
+    }
+
+    /**
+     * Maneja el subcomando createcategory para crear una nueva categoría
+     * Sintaxis: /grvtags createcategory <nombre>
+     */
+    private void handleCreateCategory(CommandSender sender, String[] args) {
+        if (args.length < 2) {
+            sender.sendMessage(colorize(PREFIX + "&cUso incorrecto. Sintaxis:"));
+            sender.sendMessage(colorize(PREFIX + "&f/grvtags createcategory <nombre>"));
+            sender.sendMessage(colorize(PREFIX + "&7Ejemplo: &f/grvtags createcategory premium"));
+            return;
+        }
+
+        String categoryName = args[1];
+
+        // Validar nombre de la categoría
+        if (!isValidCategoryName(categoryName)) {
+            sender.sendMessage(colorize(PREFIX + "&cNombre de categoría inválido. Solo se permiten letras, números y guiones bajos."));
+            return;
+        }
+
+        // Verificar que la categoría no existe
+        if (CategoryManager.categoryExists(categoryName)) {
+            sender.sendMessage(colorize(PREFIX + "&cLa categoría '&f" + categoryName + "&c' ya existe."));
+            return;
+        }
+
+        try {
+            // Crear la categoría en la base de datos
+            if (CategoryManager.createCategory(categoryName, categoryName)) {
+                sender.sendMessage(colorize(PREFIX + "&a¡Categoría '&f" + categoryName + "&a' creada exitosamente!"));
+                sender.sendMessage(colorize(PREFIX + "&7Usa &f/grvtags editor category &7para configurar la categoría."));
+
+                plugin.getLogger().info("Categoría '" + categoryName + "' creada por " + sender.getName());
+            } else {
+                sender.sendMessage(colorize(PREFIX + "&c¡Error al crear la categoría en la base de datos!"));
+            }
+        } catch (Exception e) {
+            sender.sendMessage(colorize(PREFIX + "&c¡Error al crear la categoría!"));
+            sender.sendMessage(colorize(PREFIX + "&cError: &f" + e.getMessage()));
+            plugin.getLogger().severe("Error al crear categoría '" + categoryName + "': " + e.getMessage());
+        }
+    }
+
+    /**
+     * Maneja el subcomando editor
+     * Sintaxis: /grvtags editor <category|tag|tags>
+     */
+    private void handleEditor(CommandSender sender, String[] args) {
+        if (!(sender instanceof Player)) {
+            sender.sendMessage(colorize(PREFIX + "&cEste comando solo puede ser ejecutado por un jugador."));
+            return;
+        }
+
+        if (args.length < 2) {
+            sender.sendMessage(colorize(PREFIX + "&cUso incorrecto. Sintaxis:"));
+            sender.sendMessage(colorize(PREFIX + "&f/grvtags editor <category|tag|tags>"));
+            sender.sendMessage(colorize(PREFIX + "&7- &fcategory &8- &7Editar categorías"));
+            sender.sendMessage(colorize(PREFIX + "&7- &ftag &8- &7Editar un tag específico"));
+            sender.sendMessage(colorize(PREFIX + "&7- &ftags &8- &7Ver todos los tags por categoría"));
+            return;
+        }
+
+        Player player = (Player) sender;
+        String editorType = args[1].toLowerCase();
+
+        switch (editorType) {
+            case "category":
+                openCategoryEditor(player);
+                break;
+            case "tag":
+                openTagEditor(player);
+                break;
+            case "tags":
+                openTagsOverview(player);
+                break;
+            default:
+                sender.sendMessage(colorize(PREFIX + "&cTipo de editor desconocido: &f" + editorType));
+                sender.sendMessage(colorize(PREFIX + "&7Tipos disponibles: &fcategory&7, &ftag&7, &ftags"));
+                break;
+        }
+    }
+
+    /**
+     * Muestra el menú de ayuda
      */
     private void showHelp(CommandSender sender) {
         sender.sendMessage(colorize("&8&m----------------------------------------"));
@@ -193,5 +340,29 @@ public class AdminCommand implements CommandExecutor, TabCompleter {
      */
     private String colorize(String message) {
         return ChatColor.translateAlternateColorCodes('&', message);
+    }
+
+    // Métodos auxiliares para el editor (deben ser implementados)
+    private void openCategoryEditor(Player player) {
+        // Implementación pendiente
+    }
+
+    private void openTagEditor(Player player) {
+        // Implementación pendiente
+    }
+
+    private void openTagsOverview(Player player) {
+        // Implementación pendiente
+    }
+
+    // Métodos de validación (deben ser implementados)
+    private boolean isValidTagName(String tagName) {
+        // Implementación pendiente
+        return tagName.matches("[a-zA-Z0-9_]+");
+    }
+
+    private boolean isValidCategoryName(String categoryName) {
+        // Implementación pendiente
+        return categoryName.matches("[a-zA-Z0-9_]+");
     }
 }

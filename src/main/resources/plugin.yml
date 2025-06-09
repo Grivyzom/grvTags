@@ -17,7 +17,16 @@ commands:
         permission: op
     grvTags:
         description: Comando de administración del plugin
-        usage: /<command> [reload|info|database|help]
+        usage: |
+            /<command> [subcomando]
+            Subcomandos disponibles:
+            - reload: Recarga configuraciones
+            - info: Información del plugin
+            - database: Estado de la base de datos
+            - create <nombre> <categoria>: Crear un tag
+            - createcategory <nombre>: Crear una categoría
+            - editor <category|tag|tags>: Abrir editores
+            - help: Mostrar ayuda
         aliases: [grvtags, grv]
         permission: op
 

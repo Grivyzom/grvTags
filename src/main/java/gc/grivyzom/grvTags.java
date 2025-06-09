@@ -4,6 +4,8 @@ import gc.grivyzom.commands.AdminCommand;
 import gc.grivyzom.commands.CategoryCommand;
 import gc.grivyzom.commands.TagCommand;
 import gc.grivyzom.database.DatabaseManager;
+import gc.grivyzom.managers.CategoryManager;
+import gc.grivyzom.managers.TagManager;
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.plugin.java.JavaPlugin;
@@ -45,11 +47,15 @@ public class grvTags extends JavaPlugin {
             initializeDatabase();
             sendColoredMessage(PREFIX + "&a✓ &7Base de datos inicializada");
 
-            // Registrar comandos (placeholder para futuro desarrollo)
+            // Inicializar managers
+            initializeManagers();
+            sendColoredMessage(PREFIX + "&a✓ &7Managers inicializados");
+
+            // Registrar comandos
             registerCommands();
             sendColoredMessage(PREFIX + "&a✓ &7Comandos registrados");
 
-            // Registrar eventos (placeholder para futuro desarrollo)
+            // Registrar eventos
             registerEvents();
             sendColoredMessage(PREFIX + "&a✓ &7Eventos registrados");
 
@@ -137,7 +143,26 @@ public class grvTags extends JavaPlugin {
     }
 
     /**
-     * Registra todos los comandos del plugin
+     * Inicializa los managers del plugin
+     */
+    private void initializeManagers() {
+        try {
+            // Inicializar CategoryManager
+            CategoryManager.initialize(this);
+            getLogger().info("CategoryManager inicializado correctamente");
+
+            // Inicializar TagManager
+            TagManager.initialize(this);
+            getLogger().info("TagManager inicializado correctamente");
+
+        } catch (Exception e) {
+            getLogger().severe("Error al inicializar los managers: " + e.getMessage());
+            throw e; // Re-lanzar la excepción para que se maneje en onEnable
+        }
+    }
+
+    /**
+     * Registra los comandos del plugin
      */
     private void registerCommands() {
         // Registrar comando /tags
