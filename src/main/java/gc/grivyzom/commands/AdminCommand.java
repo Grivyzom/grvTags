@@ -73,9 +73,6 @@ public class AdminCommand implements CommandExecutor, TabCompleter {
         return true;
     }
 
-    /**
-     * Maneja el subcomando reload
-     */
     private void handleReload(CommandSender sender) {
         sender.sendMessage(colorize(PREFIX + "&7Recargando configuraciones..."));
 
@@ -116,9 +113,6 @@ public class AdminCommand implements CommandExecutor, TabCompleter {
         }
     }
 
-    /**
-     * Maneja el subcomando info
-     */
     private void handleInfo(CommandSender sender) {
         sender.sendMessage(colorize("&8&m----------------------------------------"));
         sender.sendMessage(colorize("&6&l              grvTags Info"));
@@ -138,9 +132,6 @@ public class AdminCommand implements CommandExecutor, TabCompleter {
         sender.sendMessage(colorize("&8&m----------------------------------------"));
     }
 
-    /**
-     * Maneja el subcomando database
-     */
     private void handleDatabase(CommandSender sender) {
         sender.sendMessage(colorize(PREFIX + "&7Información de la base de datos:"));
         sender.sendMessage(colorize("&7- Estado: " +
@@ -163,10 +154,6 @@ public class AdminCommand implements CommandExecutor, TabCompleter {
         }
     }
 
-    /**
-     * Maneja el subcomando create para crear un nuevo tag
-     * Sintaxis: /grvtags create <nombre> <categoria>
-     */
     private void handleCreate(CommandSender sender, String[] args) {
         if (args.length < 3) {
             sender.sendMessage(colorize(PREFIX + "&cUso incorrecto. Sintaxis:"));
@@ -180,7 +167,10 @@ public class AdminCommand implements CommandExecutor, TabCompleter {
 
         // Validar nombre del tag
         if (!isValidTagName(tagName)) {
-            sender.sendMessage(colorize(PREFIX + "&cNombre de tag inválido. Solo se permiten letras, números y guiones bajos."));
+            sender.sendMessage(colorize(PREFIX + "&cNombre de tag inválido."));
+            sender.sendMessage(colorize(PREFIX + "&7- Solo se permiten letras, números y guiones bajos"));
+            sender.sendMessage(colorize(PREFIX + "&7- Longitud: 2-20 caracteres"));
+            sender.sendMessage(colorize(PREFIX + "&7- Ejemplo válido: &fVIP_Premium"));
             return;
         }
 
@@ -215,10 +205,6 @@ public class AdminCommand implements CommandExecutor, TabCompleter {
         }
     }
 
-    /**
-     * Maneja el subcomando createcategory para crear una nueva categoría
-     * Sintaxis: /grvtags createcategory <nombre>
-     */
     private void handleCreateCategory(CommandSender sender, String[] args) {
         if (args.length < 2) {
             sender.sendMessage(colorize(PREFIX + "&cUso incorrecto. Sintaxis:"));
@@ -231,7 +217,10 @@ public class AdminCommand implements CommandExecutor, TabCompleter {
 
         // Validar nombre de la categoría
         if (!isValidCategoryName(categoryName)) {
-            sender.sendMessage(colorize(PREFIX + "&cNombre de categoría inválido. Solo se permiten letras, números y guiones bajos."));
+            sender.sendMessage(colorize(PREFIX + "&cNombre de categoría inválido."));
+            sender.sendMessage(colorize(PREFIX + "&7- Solo se permiten letras, números y guiones bajos"));
+            sender.sendMessage(colorize(PREFIX + "&7- Longitud: 2-15 caracteres"));
+            sender.sendMessage(colorize(PREFIX + "&7- Ejemplo válido: &fpremium_ranks"));
             return;
         }
 
@@ -258,10 +247,6 @@ public class AdminCommand implements CommandExecutor, TabCompleter {
         }
     }
 
-    /**
-     * Maneja el subcomando editor
-     * Sintaxis: /grvtags editor <category|tag|tags>
-     */
     private void handleEditor(CommandSender sender, String[] args) {
         if (!(sender instanceof Player)) {
             sender.sendMessage(colorize(PREFIX + "&cEste comando solo puede ser ejecutado por un jugador."));
@@ -297,9 +282,6 @@ public class AdminCommand implements CommandExecutor, TabCompleter {
         }
     }
 
-    /**
-     * Muestra el menú de ayuda
-     */
     private void showHelp(CommandSender sender) {
         sender.sendMessage(colorize("&8&m----------------------------------------"));
         sender.sendMessage(colorize("&6&l            grvTags Admin"));
@@ -333,16 +315,11 @@ public class AdminCommand implements CommandExecutor, TabCompleter {
         return completions;
     }
 
-    /**
-     * Convierte códigos de color al formato de Minecraft
-     * @param message Mensaje con códigos de color
-     * @return Mensaje formateado
-     */
     private String colorize(String message) {
         return ChatColor.translateAlternateColorCodes('&', message);
     }
 
-    // Métodos auxiliares para el editor (deben ser implementados)
+    // Métodos auxiliares para el editor (a implementar)
     private void openCategoryEditor(Player player) {
         // Implementación pendiente
     }
@@ -355,14 +332,14 @@ public class AdminCommand implements CommandExecutor, TabCompleter {
         // Implementación pendiente
     }
 
-    // Métodos de validación (deben ser implementados)
-    private boolean isValidTagName(String tagName) {
+    // Métodos de validación (a implementar)
+    private boolean isValidTagName(String name) {
         // Implementación pendiente
-        return tagName.matches("[a-zA-Z0-9_]+");
+        return true;
     }
 
-    private boolean isValidCategoryName(String categoryName) {
+    private boolean isValidCategoryName(String name) {
         // Implementación pendiente
-        return categoryName.matches("[a-zA-Z0-9_]+");
+        return true;
     }
 }
