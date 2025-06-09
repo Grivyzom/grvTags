@@ -4,6 +4,7 @@ import gc.grivyzom.commands.AdminCommand;
 import gc.grivyzom.commands.CategoryCommand;
 import gc.grivyzom.commands.TagCommand;
 import gc.grivyzom.database.DatabaseManager;
+import gc.grivyzom.gui.GUIManager;
 import gc.grivyzom.listeners.PlayerListener;
 import gc.grivyzom.managers.CategoryManager;
 import gc.grivyzom.managers.PlayerDataManager;
@@ -56,6 +57,10 @@ public class grvTags extends JavaPlugin {
             initializeManagers();
             sendColoredMessage(PREFIX + "&a✓ &7Managers inicializados");
 
+            // Inicializar sistema de GUIs
+            initializeGUISystem();
+            sendColoredMessage(PREFIX + "&a✓ &7Sistema de GUIs inicializado");
+
             // Registrar comandos
             registerCommands();
             sendColoredMessage(PREFIX + "&a✓ &7Comandos registrados");
@@ -77,6 +82,7 @@ public class grvTags extends JavaPlugin {
             sendColoredMessage("&8&m----------------------------------------");
             sendColoredMessage(PREFIX + "&a¡Plugin habilitado correctamente!");
             sendColoredMessage(PREFIX + "&7Tiempo de carga: &f" + loadTime + "ms");
+            sendColoredMessage(PREFIX + "&7Sistema de GUIs: &aOperativo");
             sendColoredMessage("&8&m----------------------------------------");
 
         } catch (Exception e) {
@@ -93,6 +99,10 @@ public class grvTags extends JavaPlugin {
         sendColoredMessage(PREFIX + "&eDeshabilitando plugin...");
 
         try {
+            // Cerrar todos los GUIs activos
+            closeAllGUIs();
+            sendColoredMessage(PREFIX + "&a✓ &7GUIs cerrados");
+
             // Desregistrar PlaceholderAPI hook
             if (placeholderHook != null) {
                 placeholderHook.unregister();
@@ -181,10 +191,23 @@ public class grvTags extends JavaPlugin {
     }
 
     /**
+     * Inicializa el sistema de GUIs
+     */
+    private void initializeGUISystem() {
+        try {
+            GUIManager.initialize(this);
+            getLogger().info("Sistema de GUIs inicializado correctamente");
+        } catch (Exception e) {
+            getLogger().severe("Error al inicializar el sistema de GUIs: " + e.getMessage());
+            throw e;
+        }
+    }
+
+    /**
      * Registra los comandos del plugin
      */
     private void registerCommands() {
-        // Registrar comando /tags
+        // Registrar comando /tags (ACTUALIZADO para usar GUIs)
         TagCommand tagCommand = new TagCommand(this);
         getCommand("tag").setExecutor(tagCommand);
 
@@ -198,7 +221,7 @@ public class grvTags extends JavaPlugin {
         getCommand("grvTags").setTabCompleter(adminCommand);
 
         getLogger().info("Comandos registrados correctamente");
-        getLogger().info("- /tags - Comando para abrir GUI de tags (Default)");
+        getLogger().info("- /tags - Comando para abrir GUI de tags (Jugadores)");
         getLogger().info("- /categories - Comando para abrir GUI de categorías (OP)");
         getLogger().info("- /grvTags - Comando de administración (OP)");
     }
@@ -210,6 +233,8 @@ public class grvTags extends JavaPlugin {
         // Registrar PlayerListener
         getServer().getPluginManager().registerEvents(new PlayerListener(this), this);
         getLogger().info("Eventos registrados correctamente");
+        getLogger().info("- PlayerListener: Manejo de conexiones de jugadores");
+        getLogger().info("- GUIManager: Manejo de eventos de GUIs (auto-registrado)");
     }
 
     /**
@@ -247,6 +272,18 @@ public class grvTags extends JavaPlugin {
             }
         } else {
             sendColoredMessage(PREFIX + "&7PlaceholderAPI no disponible - placeholders deshabilitados");
+        }
+    }
+
+    /**
+     * Cierra todos los GUIs activos
+     */
+    private void closeAllGUIs() {
+        try {
+            GUIManager.closeAllGUIs();
+            getLogger().info("Todos los GUIs cerrados correctamente");
+        } catch (Exception e) {
+            getLogger().warning("Error al cerrar GUIs: " + e.getMessage());
         }
     }
 

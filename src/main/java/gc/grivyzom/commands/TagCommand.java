@@ -1,5 +1,6 @@
 package gc.grivyzom.commands;
 
+import gc.grivyzom.gui.GUIManager;
 import gc.grivyzom.grvTags;
 import org.bukkit.ChatColor;
 import org.bukkit.command.Command;
@@ -7,6 +8,10 @@ import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 
+/**
+ * Comando principal para que los jugadores accedan al sistema de tags
+ * Actualizado para usar el nuevo sistema de GUIs
+ */
 public class TagCommand implements CommandExecutor {
 
     private final grvTags plugin;
@@ -26,14 +31,27 @@ public class TagCommand implements CommandExecutor {
 
         Player player = (Player) sender;
 
-        // Por ahora mostrar mensaje placeholder ya que el GUI no está implementado
-        player.sendMessage(colorize(PREFIX + "&7Abriendo GUI de Tags..."));
-        player.sendMessage(colorize(PREFIX + "&e⚠ &7GUI en desarrollo - próximamente disponible"));
+        // Verificar permisos básicos (opcional)
+        if (!player.hasPermission("grvtags.use") && !player.hasPermission("grvtags.*")) {
+            player.sendMessage(colorize(PREFIX + "&cNo tienes permisos para usar este comando."));
+            plugin.getLogger().info("Jugador " + player.getName() + " intentó usar /tags sin permisos");
+            return true;
+        }
 
-        // TODO: Implementar apertura del GUI de tags
-        // TagGUI.openTagsGUI(player);
+        try {
+            // Abrir el GUI principal de tags usando el manager
+            GUIManager.openTagsGUI(player);
 
-        plugin.getLogger().info("Jugador " + player.getName() + " ejecutó el comando /tags");
+            plugin.getLogger().fine("Jugador " + player.getName() + " abrió el GUI de tags");
+
+        } catch (Exception e) {
+            // Manejar errores de forma segura
+            player.sendMessage(colorize(PREFIX + "&cError al abrir el menú de tags."));
+            player.sendMessage(colorize(PREFIX + "&7Si el problema persiste, contacta con un administrador."));
+
+            plugin.getLogger().severe("Error al abrir GUI de tags para " + player.getName() + ": " + e.getMessage());
+            e.printStackTrace();
+        }
 
         return true;
     }
