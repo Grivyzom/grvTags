@@ -14,6 +14,7 @@ import org.bukkit.entity.Player;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.stream.Collectors;
 
 public class AdminCommand implements CommandExecutor, TabCompleter {
 
@@ -72,6 +73,154 @@ public class AdminCommand implements CommandExecutor, TabCompleter {
 
         return true;
     }
+
+    @Override
+    public List<String> onTabComplete(CommandSender sender, Command command, String alias, String[] args) {
+        List<String> completions = new ArrayList<>();
+
+        // Solo OP puede usar autocompletado
+        if (!sender.isOp()) {
+            return completions;
+        }
+
+        // Primer argumento: subcomandos principales
+        if (args.length == 1) {
+            List<String> subCommands = Arrays.asList(
+                    "reload", "info", "database", "create", "createcategory", "editor", "help"
+            );
+
+            String partial = args[0].toLowerCase();
+            for (String subCommand : subCommands) {
+                if (subCommand.startsWith(partial)) {
+                    completions.add(subCommand);
+                }
+            }
+            return completions;
+        }
+
+        // Autocompletado específico por subcomando
+        String subCommand = args[0].toLowerCase();
+
+        switch (subCommand) {
+            case "create":
+                return handleCreateTabComplete(args);
+            case "createcategory":
+                return handleCreateCategoryTabComplete(args);
+            case "editor":
+                return handleEditorTabComplete(args);
+            default:
+                return completions;
+        }
+    }
+
+    /**
+     * Autocompletado para el comando create
+     * /grvtags create <nombre> <categoria>
+     */
+    private List<String> handleCreateTabComplete(String[] args) {
+        List<String> completions = new ArrayList<>();
+
+        if (args.length == 2) {
+            // Segundo argumento: nombre del tag (sugerencias)
+            List<String> tagSuggestions = Arrays.asList(
+                    "Example", "Grivyzom"
+            );
+
+            String partial = args[1].toLowerCase();
+            for (String suggestion : tagSuggestions) {
+                if (suggestion.toLowerCase().startsWith(partial)) {
+                    completions.add(suggestion);
+                }
+            }
+        } else if (args.length == 3) {
+            // Tercer argumento: categorías existentes
+            List<String> categoryNames = CategoryManager.getAllCategoryNames();
+            String partial = args[2].toLowerCase();
+
+            for (String categoryName : categoryNames) {
+                if (categoryName.toLowerCase().startsWith(partial)) {
+                    completions.add(categoryName);
+                }
+            }
+        }
+
+        return completions;
+    }
+
+    /**
+     * Autocompletado para el comando createcategory
+     * /grvtags createcategory <nombre>
+     */
+    private List<String> handleCreateCategoryTabComplete(String[] args) {
+        List<String> completions = new ArrayList<>();
+
+        if (args.length == 2) {
+            // Segundo argumento: nombre de la categoría (sugerencias comunes)
+            List<String> categorySuggestions = Arrays.asList(
+                    "premium", "ranks", "staff", "donators", "seasonal",
+                    "special", "event", "custom", "limited", "exclusive",
+                    "halloween", "christmas", "easter", "anniversary",
+                    "admin", "moderator", "helper", "builder"
+            );
+
+            String partial = args[1].toLowerCase();
+            for (String suggestion : categorySuggestions) {
+                if (suggestion.startsWith(partial)) {
+                    completions.add(suggestion);
+                }
+            }
+        }
+
+        return completions;
+    }
+
+    /**
+     * Autocompletado para el comando editor
+     * /grvtags editor <category|tag|tags>
+     */
+    private List<String> handleEditorTabComplete(String[] args) {
+        List<String> completions = new ArrayList<>();
+
+        if (args.length == 2) {
+            // Segundo argumento: tipos de editor
+            List<String> editorTypes = Arrays.asList("category", "tag", "tags");
+            String partial = args[1].toLowerCase();
+
+            for (String editorType : editorTypes) {
+                if (editorType.startsWith(partial)) {
+                    completions.add(editorType);
+                }
+            }
+        } else if (args.length == 3) {
+            String editorType = args[1].toLowerCase();
+
+            if ("tag".equals(editorType)) {
+                // Para editor de tag específico: mostrar tags existentes
+                List<String> tagNames = TagManager.getAllTagNames();
+                String partial = args[2].toLowerCase();
+
+                for (String tagName : tagNames) {
+                    if (tagName.toLowerCase().startsWith(partial)) {
+                        completions.add(tagName);
+                    }
+                }
+            } else if ("category".equals(editorType)) {
+                // Para editor de categoría específica: mostrar categorías existentes
+                List<String> categoryNames = CategoryManager.getAllCategoryNames();
+                String partial = args[2].toLowerCase();
+
+                for (String categoryName : categoryNames) {
+                    if (categoryName.toLowerCase().startsWith(partial)) {
+                        completions.add(categoryName);
+                    }
+                }
+            }
+        }
+
+        return completions;
+    }
+
+    // [Resto de métodos sin cambios...]
 
     private void handleReload(CommandSender sender) {
         sender.sendMessage(colorize(PREFIX + "&7Recargando configuraciones..."));
@@ -289,30 +438,11 @@ public class AdminCommand implements CommandExecutor, TabCompleter {
         sender.sendMessage(colorize("&f/grvTags reload &8- &7Recarga las configuraciones"));
         sender.sendMessage(colorize("&f/grvTags info &8- &7Información del plugin"));
         sender.sendMessage(colorize("&f/grvTags database &8- &7Estado de la base de datos"));
+        sender.sendMessage(colorize("&f/grvTags create <nombre> <categoria> &8- &7Crear un tag"));
+        sender.sendMessage(colorize("&f/grvTags createcategory <nombre> &8- &7Crear una categoría"));
+        sender.sendMessage(colorize("&f/grvTags editor <type> &8- &7Abrir editores GUI"));
         sender.sendMessage(colorize("&f/grvTags help &8- &7Muestra esta ayuda"));
         sender.sendMessage(colorize("&8&m----------------------------------------"));
-    }
-
-    @Override
-    public List<String> onTabComplete(CommandSender sender, Command command, String alias, String[] args) {
-        List<String> completions = new ArrayList<>();
-
-        if (!sender.isOp()) {
-            return completions;
-        }
-
-        if (args.length == 1) {
-            List<String> subCommands = Arrays.asList("reload", "info", "database", "help");
-            String partial = args[0].toLowerCase();
-
-            for (String subCommand : subCommands) {
-                if (subCommand.startsWith(partial)) {
-                    completions.add(subCommand);
-                }
-            }
-        }
-
-        return completions;
     }
 
     private String colorize(String message) {
@@ -321,25 +451,43 @@ public class AdminCommand implements CommandExecutor, TabCompleter {
 
     // Métodos auxiliares para el editor (a implementar)
     private void openCategoryEditor(Player player) {
-        // Implementación pendiente
+        player.sendMessage(colorize(PREFIX + "&e⚠ &7Editor de categorías en desarrollo"));
     }
 
     private void openTagEditor(Player player) {
-        // Implementación pendiente
+        player.sendMessage(colorize(PREFIX + "&e⚠ &7Editor de tags en desarrollo"));
     }
 
     private void openTagsOverview(Player player) {
-        // Implementación pendiente
+        player.sendMessage(colorize(PREFIX + "&e⚠ &7Vista general de tags en desarrollo"));
     }
 
-    // Métodos de validación (a implementar)
+    // Métodos de validación mejorados
     private boolean isValidTagName(String name) {
-        // Implementación pendiente
-        return true;
+        if (name == null || name.isEmpty()) {
+            return false;
+        }
+
+        // Longitud entre 2 y 20 caracteres
+        if (name.length() < 2 || name.length() > 20) {
+            return false;
+        }
+
+        // Solo letras, números y guiones bajos
+        return name.matches("^[a-zA-Z0-9_]+$");
     }
 
     private boolean isValidCategoryName(String name) {
-        // Implementación pendiente
-        return true;
+        if (name == null || name.isEmpty()) {
+            return false;
+        }
+
+        // Longitud entre 2 y 15 caracteres
+        if (name.length() < 2 || name.length() > 15) {
+            return false;
+        }
+
+        // Solo letras, números y guiones bajos
+        return name.matches("^[a-zA-Z0-9_]+$");
     }
 }
