@@ -1,0 +1,16 @@
+name: grvTags
+version: 1.0
+main: gc.grivyzom.grvTags
+api-version: 1.13
+author: Brocolitx
+description: Sistema completo de tags con categorías y MySQL
+
+commands:
+    tag:
+        description: Comando principal de tags
+        usage: /<command> [args]
+        aliases: [tags]
+    category:
+        description: Comando para gestionar categorías
+        usage: /<command> [args]
+        aliases: [categorias, cat]
