@@ -34,6 +34,7 @@ public class MainTagsGUI extends BaseGUI {
 
     // Configuración de posicionamiento automático
     private static final int[] CATEGORY_SLOTS = {
+            10, 11, 12, 13, 14, 15, 16,
             19, 20, 21, 22, 23, 24, 25,  // Fila 3 (7 slots)
             28, 29, 30, 31, 32, 33, 34,  // Fila 4 (7 slots)
             37, 38, 39, 40, 41, 42, 43   // Fila 5 (7 slots)
