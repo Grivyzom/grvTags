@@ -4,8 +4,11 @@ import gc.grivyzom.commands.AdminCommand;
 import gc.grivyzom.commands.CategoryCommand;
 import gc.grivyzom.commands.TagCommand;
 import gc.grivyzom.database.DatabaseManager;
+import gc.grivyzom.listeners.PlayerListener;
 import gc.grivyzom.managers.CategoryManager;
+import gc.grivyzom.managers.PlayerDataManager;
 import gc.grivyzom.managers.TagManager;
+import gc.grivyzom.placeholders.GrvTagsPlaceholders;
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.plugin.java.JavaPlugin;
@@ -16,6 +19,8 @@ public class grvTags extends JavaPlugin {
     private static final String PLUGIN_NAME = "grvTags";
     private static final String VERSION = "1.0";
     private static final String AUTHOR = "Brocolitx";
+
+    private GrvTagsPlaceholders placeholderHook;
 
     @Override
     public void onEnable() {
@@ -63,6 +68,9 @@ public class grvTags extends JavaPlugin {
             checkDependencies();
             sendColoredMessage(PREFIX + "&a✓ &7Dependencias verificadas");
 
+            // Inicializar PlaceholderAPI hook
+            initializePlaceholders();
+
             long endTime = System.currentTimeMillis();
             long loadTime = endTime - startTime;
 
@@ -85,6 +93,12 @@ public class grvTags extends JavaPlugin {
         sendColoredMessage(PREFIX + "&eDeshabilitando plugin...");
 
         try {
+            // Desregistrar PlaceholderAPI hook
+            if (placeholderHook != null) {
+                placeholderHook.unregister();
+                sendColoredMessage(PREFIX + "&a✓ &7PlaceholderAPI hook desregistrado");
+            }
+
             // Guardar datos pendientes
             saveData();
             sendColoredMessage(PREFIX + "&a✓ &7Datos guardados");
@@ -115,9 +129,10 @@ public class grvTags extends JavaPlugin {
 
         // Cargar config.yml
         reloadConfig();
-        // Aquí se cargarían otros archivos como tags.yml, categories.yml
-        // saveResource("tags.yml", false);
-        // saveResource("categories.yml", false);
+
+        // Guardar tags.yml y categories.yml si no existen
+        saveResource("tags.yml", false);
+        saveResource("categories.yml", false);
 
         getLogger().info("Configuraciones cargadas correctamente");
     }
@@ -151,9 +166,13 @@ public class grvTags extends JavaPlugin {
             CategoryManager.initialize(this);
             getLogger().info("CategoryManager inicializado correctamente");
 
-            // Inicializar TagManager
+            // Inicializar TagManager (con carga desde YAML)
             TagManager.initialize(this);
             getLogger().info("TagManager inicializado correctamente");
+
+            // Inicializar PlayerDataManager
+            PlayerDataManager.initialize(this);
+            getLogger().info("PlayerDataManager inicializado correctamente");
 
         } catch (Exception e) {
             getLogger().severe("Error al inicializar los managers: " + e.getMessage());
@@ -188,8 +207,8 @@ public class grvTags extends JavaPlugin {
      * Registra todos los eventos del plugin
      */
     private void registerEvents() {
-        // Placeholder para registro de eventos
-        // getServer().getPluginManager().registerEvents(new PlayerListener(), this);
+        // Registrar PlayerListener
+        getServer().getPluginManager().registerEvents(new PlayerListener(this), this);
         getLogger().info("Eventos registrados correctamente");
     }
 
@@ -213,11 +232,29 @@ public class grvTags extends JavaPlugin {
     }
 
     /**
+     * Inicializa los placeholders de PlaceholderAPI
+     */
+    private void initializePlaceholders() {
+        // Verificar si PlaceholderAPI está disponible
+        if (getServer().getPluginManager().getPlugin("PlaceholderAPI") != null) {
+            try {
+                placeholderHook = new GrvTagsPlaceholders(this);
+                placeholderHook.register();
+                sendColoredMessage(PREFIX + "&a✓ &7PlaceholderAPI hook inicializado");
+            } catch (Exception e) {
+                sendColoredMessage(PREFIX + "&c✗ &7Error al inicializar PlaceholderAPI hook: " + e.getMessage());
+                getLogger().warning("Error al inicializar PlaceholderAPI: " + e.getMessage());
+            }
+        } else {
+            sendColoredMessage(PREFIX + "&7PlaceholderAPI no disponible - placeholders deshabilitados");
+        }
+    }
+
+    /**
      * Guarda datos pendientes antes del apagado
      */
     private void saveData() {
-        // Placeholder para guardar datos
-        // DatabaseManager.saveAllData();
+        // Placeholder para guardar datos adicionales si es necesario
         getLogger().info("Datos guardados correctamente");
     }
 

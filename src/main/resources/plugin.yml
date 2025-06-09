@@ -37,3 +37,5 @@ permissions:
     grvtags.use:
         description: Uso básico del plugin (comando /tags)
         default: true
+
+softdepend: [Vault, PlaceHolderApi]

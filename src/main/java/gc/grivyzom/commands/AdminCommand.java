@@ -3,8 +3,11 @@ package gc.grivyzom.commands;
 import gc.grivyzom.database.DatabaseManager;
 import gc.grivyzom.grvTags;
 import gc.grivyzom.managers.CategoryManager;
+import gc.grivyzom.managers.PlayerDataManager;
 import gc.grivyzom.managers.TagManager;
+import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
+import org.bukkit.OfflinePlayer;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
@@ -62,6 +65,18 @@ public class AdminCommand implements CommandExecutor, TabCompleter {
             case "editor":
                 handleEditor(sender, args);
                 break;
+            case "give":
+                handleGiveTag(sender, args);
+                break;
+            case "take":
+                handleTakeTag(sender, args);
+                break;
+            case "set":
+                handleSetTag(sender, args);
+                break;
+            case "check":
+                handleCheckPlayer(sender, args);
+                break;
             case "help":
                 showHelp(sender);
                 break;
@@ -86,7 +101,8 @@ public class AdminCommand implements CommandExecutor, TabCompleter {
         // Primer argumento: subcomandos principales
         if (args.length == 1) {
             List<String> subCommands = Arrays.asList(
-                    "reload", "info", "database", "create", "createcategory", "editor", "help"
+                    "reload", "info", "database", "create", "createcategory", "editor",
+                    "give", "take", "set", "check", "help"
             );
 
             String partial = args[0].toLowerCase();
@@ -108,10 +124,268 @@ public class AdminCommand implements CommandExecutor, TabCompleter {
                 return handleCreateCategoryTabComplete(args);
             case "editor":
                 return handleEditorTabComplete(args);
+            case "give":
+            case "take":
+            case "set":
+                return handlePlayerTagTabComplete(args);
+            case "check":
+                return handleCheckTabComplete(args);
             default:
                 return completions;
         }
     }
+
+    /**
+     * Autocompletado para comandos que requieren jugador y tag
+     */
+    private List<String> handlePlayerTagTabComplete(String[] args) {
+        List<String> completions = new ArrayList<>();
+
+        if (args.length == 2) {
+            // Segundo argumento: nombres de jugadores
+            String partial = args[1].toLowerCase();
+            for (Player player : Bukkit.getOnlinePlayers()) {
+                if (player.getName().toLowerCase().startsWith(partial)) {
+                    completions.add(player.getName());
+                }
+            }
+        } else if (args.length == 3) {
+            // Tercer argumento: nombres de tags
+            List<String> tagNames = TagManager.getAllTagNames();
+            String partial = args[2].toLowerCase();
+
+            for (String tagName : tagNames) {
+                if (tagName.toLowerCase().startsWith(partial)) {
+                    completions.add(tagName);
+                }
+            }
+        }
+
+        return completions;
+    }
+
+    /**
+     * Autocompletado para el comando check
+     */
+    private List<String> handleCheckTabComplete(String[] args) {
+        List<String> completions = new ArrayList<>();
+
+        if (args.length == 2) {
+            // Segundo argumento: nombres de jugadores
+            String partial = args[1].toLowerCase();
+            for (Player player : Bukkit.getOnlinePlayers()) {
+                if (player.getName().toLowerCase().startsWith(partial)) {
+                    completions.add(player.getName());
+                }
+            }
+        }
+
+        return completions;
+    }
+
+    /**
+     * Maneja el comando give para dar un tag a un jugador
+     */
+    private void handleGiveTag(CommandSender sender, String[] args) {
+        if (args.length < 3) {
+            sender.sendMessage(colorize(PREFIX + "&cUso incorrecto. Sintaxis:"));
+            sender.sendMessage(colorize(PREFIX + "&f/grvtags give <jugador> <tag>"));
+            sender.sendMessage(colorize(PREFIX + "&7Ejemplo: &f/grvtags give Brocolitx example"));
+            return;
+        }
+
+        String playerName = args[1];
+        String tagName = args[2];
+
+        // Verificar que el tag existe
+        if (!TagManager.tagExists(tagName)) {
+            sender.sendMessage(colorize(PREFIX + "&cEl tag '&f" + tagName + "&c' no existe."));
+            return;
+        }
+
+        // Obtener el jugador (puede estar offline)
+        OfflinePlayer offlinePlayer = Bukkit.getOfflinePlayer(playerName);
+        if (!offlinePlayer.hasPlayedBefore()) {
+            sender.sendMessage(colorize(PREFIX + "&cEl jugador '&f" + playerName + "&c' nunca ha jugado en el servidor."));
+            return;
+        }
+
+        // Dar el tag al jugador
+        if (PlayerDataManager.unlockTagForPlayer(offlinePlayer.getUniqueId(), tagName)) {
+            sender.sendMessage(colorize(PREFIX + "&a¡Tag '&f" + tagName + "&a' dado exitosamente a &f" + playerName + "&a!"));
+
+            // Notificar al jugador si está online
+            Player onlinePlayer = offlinePlayer.getPlayer();
+            if (onlinePlayer != null && onlinePlayer.isOnline()) {
+                onlinePlayer.sendMessage(colorize(PREFIX + "&a¡Has desbloqueado el tag '&f" + tagName + "&a'!"));
+            }
+
+            plugin.getLogger().info("Tag '" + tagName + "' dado a " + playerName + " por " + sender.getName());
+        } else {
+            sender.sendMessage(colorize(PREFIX + "&cError al dar el tag. El jugador puede que ya lo tenga."));
+        }
+    }
+
+    /**
+     * Maneja el comando take para quitar un tag a un jugador
+     */
+    private void handleTakeTag(CommandSender sender, String[] args) {
+        if (args.length < 3) {
+            sender.sendMessage(colorize(PREFIX + "&cUso incorrecto. Sintaxis:"));
+            sender.sendMessage(colorize(PREFIX + "&f/grvtags take <jugador> <tag>"));
+            sender.sendMessage(colorize(PREFIX + "&7Ejemplo: &f/grvtags take Brocolitx example"));
+            return;
+        }
+
+        String playerName = args[1];
+        String tagName = args[2];
+
+        // Obtener el jugador (puede estar offline)
+        OfflinePlayer offlinePlayer = Bukkit.getOfflinePlayer(playerName);
+        if (!offlinePlayer.hasPlayedBefore()) {
+            sender.sendMessage(colorize(PREFIX + "&cEl jugador '&f" + playerName + "&c' nunca ha jugado en el servidor."));
+            return;
+        }
+
+        // Quitar el tag al jugador
+        if (PlayerDataManager.removeUnlockedTag(offlinePlayer.getUniqueId(), tagName)) {
+            sender.sendMessage(colorize(PREFIX + "&a¡Tag '&f" + tagName + "&a' quitado exitosamente de &f" + playerName + "&a!"));
+
+            // Si el jugador tenía este tag activo, quitárselo
+            String currentTag = PlayerDataManager.getPlayerTag(offlinePlayer.getUniqueId());
+            if (TagManager.getTag(tagName) != null &&
+                    TagManager.getTag(tagName).getDisplayTag().equals(currentTag)) {
+                PlayerDataManager.setPlayerTag(offlinePlayer.getUniqueId(), null);
+
+                // Notificar al jugador si está online
+                Player onlinePlayer = offlinePlayer.getPlayer();
+                if (onlinePlayer != null && onlinePlayer.isOnline()) {
+                    onlinePlayer.sendMessage(colorize(PREFIX + "&cTu tag '&f" + tagName + "&c' ha sido removido."));
+                }
+            }
+
+            plugin.getLogger().info("Tag '" + tagName + "' quitado de " + playerName + " por " + sender.getName());
+        } else {
+            sender.sendMessage(colorize(PREFIX + "&cError al quitar el tag. El jugador puede que no lo tenga."));
+        }
+    }
+
+    /**
+     * Maneja el comando set para establecer el tag activo de un jugador
+     */
+    private void handleSetTag(CommandSender sender, String[] args) {
+        if (args.length < 3) {
+            sender.sendMessage(colorize(PREFIX + "&cUso incorrecto. Sintaxis:"));
+            sender.sendMessage(colorize(PREFIX + "&f/grvtags set <jugador> <tag|none>"));
+            sender.sendMessage(colorize(PREFIX + "&7Ejemplo: &f/grvtags set Brocolitx example"));
+            sender.sendMessage(colorize(PREFIX + "&7Para quitar tag: &f/grvtags set Brocolitx none"));
+            return;
+        }
+
+        String playerName = args[1];
+        String tagName = args[2];
+
+        // Obtener el jugador (puede estar offline)
+        OfflinePlayer offlinePlayer = Bukkit.getOfflinePlayer(playerName);
+        if (!offlinePlayer.hasPlayedBefore()) {
+            sender.sendMessage(colorize(PREFIX + "&cEl jugador '&f" + playerName + "&c' nunca ha jugado en el servidor."));
+            return;
+        }
+
+        // Si el tag es "none", quitar el tag activo
+        if (tagName.equalsIgnoreCase("none")) {
+            if (PlayerDataManager.setPlayerTag(offlinePlayer.getUniqueId(), null)) {
+                sender.sendMessage(colorize(PREFIX + "&a¡Tag removido de &f" + playerName + "&a! Ahora usa el tag default."));
+
+                // Notificar al jugador si está online
+                Player onlinePlayer = offlinePlayer.getPlayer();
+                if (onlinePlayer != null && onlinePlayer.isOnline()) {
+                    onlinePlayer.sendMessage(colorize(PREFIX + "&7Tu tag ha sido removido. Ahora usas el tag por defecto."));
+                }
+            } else {
+                sender.sendMessage(colorize(PREFIX + "&cError al remover el tag."));
+            }
+            return;
+        }
+
+        // Verificar que el tag existe
+        if (!TagManager.tagExists(tagName)) {
+            sender.sendMessage(colorize(PREFIX + "&cEl tag '&f" + tagName + "&c' no existe."));
+            return;
+        }
+
+        // Verificar que el jugador tiene el tag desbloqueado
+        if (!PlayerDataManager.hasPlayerUnlockedTag(offlinePlayer.getUniqueId(), tagName)) {
+            sender.sendMessage(colorize(PREFIX + "&cEl jugador '&f" + playerName + "&c' no tiene el tag '&f" + tagName + "&c' desbloqueado."));
+            sender.sendMessage(colorize(PREFIX + "&7Usa &f/grvtags give " + playerName + " " + tagName + " &7para dárselo primero."));
+            return;
+        }
+
+        // Establecer el tag activo
+        if (PlayerDataManager.setPlayerTag(offlinePlayer.getUniqueId(), tagName)) {
+            sender.sendMessage(colorize(PREFIX + "&a¡Tag '&f" + tagName + "&a' establecido para &f" + playerName + "&a!"));
+
+            // Notificar al jugador si está online
+            Player onlinePlayer = offlinePlayer.getPlayer();
+            if (onlinePlayer != null && onlinePlayer.isOnline()) {
+                onlinePlayer.sendMessage(colorize(PREFIX + "&a¡Tu tag ha sido cambiado a '&f" + tagName + "&a'!"));
+            }
+
+            plugin.getLogger().info("Tag '" + tagName + "' establecido para " + playerName + " por " + sender.getName());
+        } else {
+            sender.sendMessage(colorize(PREFIX + "&cError al establecer el tag."));
+        }
+    }
+
+    /**
+     * Maneja el comando check para ver información de un jugador
+     */
+    private void handleCheckPlayer(CommandSender sender, String[] args) {
+        if (args.length < 2) {
+            sender.sendMessage(colorize(PREFIX + "&cUso incorrecto. Sintaxis:"));
+            sender.sendMessage(colorize(PREFIX + "&f/grvtags check <jugador>"));
+            sender.sendMessage(colorize(PREFIX + "&7Ejemplo: &f/grvtags check Brocolitx"));
+            return;
+        }
+
+        String playerName = args[1];
+
+        // Obtener el jugador (puede estar offline)
+        OfflinePlayer offlinePlayer = Bukkit.getOfflinePlayer(playerName);
+        if (!offlinePlayer.hasPlayedBefore()) {
+            sender.sendMessage(colorize(PREFIX + "&cEl jugador '&f" + playerName + "&c' nunca ha jugado en el servidor."));
+            return;
+        }
+
+        // Mostrar información del jugador
+        sender.sendMessage(colorize("&8&m----------------------------------------"));
+        sender.sendMessage(colorize("&6&l         Información de " + playerName));
+        sender.sendMessage(colorize("&8&m----------------------------------------"));
+
+        // Tag actual
+        String currentTag = PlayerDataManager.getPlayerTag(offlinePlayer.getUniqueId());
+        sender.sendMessage(colorize("&7Tag actual: " + currentTag));
+
+        // Total de tags desbloqueados
+        int totalTags = PlayerDataManager.getPlayerTagCount(offlinePlayer.getUniqueId());
+        sender.sendMessage(colorize("&7Tags desbloqueados: &f" + totalTags));
+
+        // Tags por categoría
+        List<String> categoryNames = CategoryManager.getAllCategoryNames();
+        for (String categoryName : categoryNames) {
+            int categoryTagCount = PlayerDataManager.getPlayerTagCountByCategory(offlinePlayer.getUniqueId(), categoryName);
+            if (categoryTagCount > 0) {
+                sender.sendMessage(colorize("&7- " + categoryName + ": &f" + categoryTagCount + " tags"));
+            }
+        }
+
+        // Estado de conexión
+        sender.sendMessage(colorize("&7Estado: " + (offlinePlayer.isOnline() ? "&aConectado" : "&cDesconectado")));
+
+        sender.sendMessage(colorize("&8&m----------------------------------------"));
+    }
+
+    // [Resto de métodos sin cambios...]
 
     /**
      * Autocompletado para el comando create
@@ -220,8 +494,6 @@ public class AdminCommand implements CommandExecutor, TabCompleter {
         return completions;
     }
 
-    // [Resto de métodos sin cambios...]
-
     private void handleReload(CommandSender sender) {
         sender.sendMessage(colorize(PREFIX + "&7Recargando configuraciones..."));
 
@@ -243,9 +515,10 @@ public class AdminCommand implements CommandExecutor, TabCompleter {
             }
 
             // Recargar tags.yml y categories.yml
-            TagManager.loadAllTags();
+            TagManager.loadAllTags(); // Cambiado de reloadTags() a loadAllTags()
             CategoryManager.loadAllCategories();
-            sender.sendMessage(colorize(PREFIX + "&a✓ &7Tags y categorías recargados"));
+            PlayerDataManager.reloadDefaultTag();
+            sender.sendMessage(colorize(PREFIX + "&a✓ &7Tags, categorías y datos de jugadores recargados"));
 
             long endTime = System.currentTimeMillis();
             long reloadTime = endTime - startTime;
@@ -277,6 +550,7 @@ public class AdminCommand implements CommandExecutor, TabCompleter {
         // Información de managers
         sender.sendMessage(colorize("&7Tags cargados: &f" + TagManager.getTagCount()));
         sender.sendMessage(colorize("&7Categorías cargadas: &f" + CategoryManager.getCategoryCount()));
+        sender.sendMessage(colorize("&7Tag default: " + PlayerDataManager.getDefaultTag()));
 
         sender.sendMessage(colorize("&8&m----------------------------------------"));
     }
@@ -441,6 +715,12 @@ public class AdminCommand implements CommandExecutor, TabCompleter {
         sender.sendMessage(colorize("&f/grvTags create <nombre> <categoria> &8- &7Crear un tag"));
         sender.sendMessage(colorize("&f/grvTags createcategory <nombre> &8- &7Crear una categoría"));
         sender.sendMessage(colorize("&f/grvTags editor <type> &8- &7Abrir editores GUI"));
+        sender.sendMessage(colorize(""));
+        sender.sendMessage(colorize("&6&lComandos de Jugadores:"));
+        sender.sendMessage(colorize("&f/grvTags give <jugador> <tag> &8- &7Dar un tag a un jugador"));
+        sender.sendMessage(colorize("&f/grvTags take <jugador> <tag> &8- &7Quitar un tag de un jugador"));
+        sender.sendMessage(colorize("&f/grvTags set <jugador> <tag|none> &8- &7Establecer tag activo"));
+        sender.sendMessage(colorize("&f/grvTags check <jugador> &8- &7Ver información de un jugador"));
         sender.sendMessage(colorize("&f/grvTags help &8- &7Muestra esta ayuda"));
         sender.sendMessage(colorize("&8&m----------------------------------------"));
     }

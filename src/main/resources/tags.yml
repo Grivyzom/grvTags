@@ -5,21 +5,52 @@
 ############################################################
 
 tags:
+  default: # TAG que se muestra si no tienes ningún tag
+    tag: '&8[&7?&8]'
+    permission: '' # Sin permiso requerido para el tag default
+    description: '&7Tag por defecto para jugadores sin tag'
+    category: 'default'
+    order: 0
+    displayname: '&7Tag por defecto'
+    display-item: 'BARRIER'
+    cost: 0 # Gratis
+
   hexsupport: # 1.16+ server is required for hex colors to work.
     tag: '&8[&#afe4a4&lH&#b1cdb1&le&#b3b6bd&lx&#b59fca&lC&#b688d7&lo&#b871e3&ll&#ba5af0&lo&#bc43fd&lr&8]'
-    permission: 'supremetags.tag.hex'
+    permission: 'grvtags.tag.hex'
     description: '&7This plugin supports normal/hex colors'
     category: 'default'
     order: 1
     displayname: '&7Tag: %tag%'
     display-item: 'NAME_TAG'
     cost: 200 # this is only implemented when 'cost-system' is enabled
+
   santa: # Christmas themed tag, shows in the Xmas category.
     tag: '&8[&c&lSanta&8]'
-    permission: 'supremetags.tag.santa'
+    permission: 'grvtags.tag.santa'
     description: '&7ho ho hooooooo!'
     category: 'xmas'
     order: 2
     displayname: '&7Tag: %tag%'
     display-item: 'NAME_TAG'
     cost: 100 # setting this to 0 when 'cost-system' is enabled, will make this tag free.
+
+  example:
+    tag: '&8[&aExample&8]'
+    permission: 'grvtags.tag.example'
+    description: '&7Un tag de ejemplo'
+    category: 'default'
+    order: 3
+    displayname: '&7Tag: %tag%'
+    display-item: 'NAME_TAG'
+    cost: 0
+
+  grivyzom:
+    tag: '&8[&6&lGrivyzom&8]'
+    permission: 'grvtags.tag.grivyzom'
+    description: '&7Tag especial del desarrollador'
+    category: 'vip'
+    order: 1
+    displayname: '&7Tag: %tag%'
+    display-item: 'DIAMOND'
+    cost: 500

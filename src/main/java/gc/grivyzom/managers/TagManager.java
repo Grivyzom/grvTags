@@ -3,7 +3,10 @@ package gc.grivyzom.managers;
 import gc.grivyzom.database.DatabaseManager;
 import gc.grivyzom.grvTags;
 import gc.grivyzom.models.Tag;
+import org.bukkit.configuration.ConfigurationSection;
+import org.bukkit.configuration.file.YamlConfiguration;
 
+import java.io.File;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -25,7 +28,8 @@ public class TagManager {
     public static void initialize(grvTags pluginInstance) {
         plugin = pluginInstance;
         createTablesIfNotExist();
-        loadAllTags();
+        loadTagsFromYaml(); // Cargar primero desde YAML
+        loadAllTags(); // Luego desde base de datos
     }
 
     /**
@@ -311,5 +315,119 @@ public class TagManager {
      */
     public static List<String> getAllTagNames() {
         return new ArrayList<>(loadedTags.keySet());
+    }
+
+    private static void loadTagsFromYaml() {
+        try {
+            File tagsFile = new File(plugin.getDataFolder(), "tags.yml");
+
+            if (!tagsFile.exists()) {
+                plugin.saveResource("tags.yml", false);
+            }
+
+            YamlConfiguration tagsConfig = YamlConfiguration.loadConfiguration(tagsFile);
+            ConfigurationSection tagsSection = tagsConfig.getConfigurationSection("tags");
+
+            if (tagsSection == null) {
+                plugin.getLogger().warning("No se encontró sección 'tags' en tags.yml");
+                return;
+            }
+
+            int syncedTags = 0;
+            for (String tagName : tagsSection.getKeys(false)) {
+                ConfigurationSection tagSection = tagsSection.getConfigurationSection(tagName);
+                if (tagSection == null) continue;
+
+                String displayTag = tagSection.getString("tag", "&8[&7" + tagName + "&8]");
+                String permission = tagSection.getString("permission", "grvtags.tag." + tagName.toLowerCase());
+                String description = tagSection.getString("description", "Tag cargado desde YAML");
+                String category = tagSection.getString("category", "default");
+                int order = tagSection.getInt("order", 1);
+                String displayName = tagSection.getString("displayname", "&7Tag: %tag%");
+                String displayItem = tagSection.getString("display-item", "NAME_TAG");
+                int cost = tagSection.getInt("cost", 0);
+
+                // Sincronizar con base de datos
+                syncTagToDatabase(tagName, displayTag, permission, description,
+                        category, order, displayName, displayItem, cost);
+
+                syncedTags++;
+            }
+
+            plugin.getLogger().info("Sincronizados " + syncedTags + " tags desde tags.yml a la base de datos");
+
+        } catch (Exception e) {
+            plugin.getLogger().log(Level.SEVERE, "Error al cargar tags desde tags.yml:", e);
+        }
+    }
+
+    /**
+     * Sincroniza un tag con la base de datos
+     */
+    private static void syncTagToDatabase(String name, String displayTag, String permission,
+                                          String description, String category, int order,
+                                          String displayName, String displayItem, int cost) {
+        try {
+            Connection conn = DatabaseManager.getConnection();
+            if (conn == null) return;
+
+            // Verificar si el tag ya existe
+            String checkQuery = "SELECT id FROM grvtags_tags WHERE name = ?";
+            PreparedStatement checkStmt = conn.prepareStatement(checkQuery);
+            checkStmt.setString(1, name);
+            ResultSet rs = checkStmt.executeQuery();
+
+            if (rs.next()) {
+                // Tag existe, actualizar
+                String updateQuery = """
+                    UPDATE grvtags_tags SET 
+                        display_tag = ?, permission = ?, description = ?, 
+                        category = ?, display_order = ?, display_name = ?, 
+                        display_item = ?, cost = ?, updated_at = CURRENT_TIMESTAMP
+                    WHERE name = ?
+                """;
+
+                PreparedStatement updateStmt = conn.prepareStatement(updateQuery);
+                updateStmt.setString(1, displayTag);
+                updateStmt.setString(2, permission);
+                updateStmt.setString(3, description);
+                updateStmt.setString(4, category);
+                updateStmt.setInt(5, order);
+                updateStmt.setString(6, displayName);
+                updateStmt.setString(7, displayItem);
+                updateStmt.setInt(8, cost);
+                updateStmt.setString(9, name);
+
+                updateStmt.executeUpdate();
+                updateStmt.close();
+            } else {
+                // Tag no existe, insertar
+                String insertQuery = """
+                    INSERT INTO grvtags_tags (name, display_tag, permission, description, 
+                                            category, display_order, display_name, display_item, cost)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """;
+
+                PreparedStatement insertStmt = conn.prepareStatement(insertQuery);
+                insertStmt.setString(1, name);
+                insertStmt.setString(2, displayTag);
+                insertStmt.setString(3, permission);
+                insertStmt.setString(4, description);
+                insertStmt.setString(5, category);
+                insertStmt.setInt(6, order);
+                insertStmt.setString(7, displayName);
+                insertStmt.setString(8, displayItem);
+                insertStmt.setInt(9, cost);
+
+                insertStmt.executeUpdate();
+                insertStmt.close();
+            }
+
+            rs.close();
+            checkStmt.close();
+
+        } catch (SQLException e) {
+            plugin.getLogger().log(Level.SEVERE, "Error al sincronizar tag '" + name + "' con la base de datos:", e);
+        }
     }
 }
