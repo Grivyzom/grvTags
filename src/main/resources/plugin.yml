@@ -7,10 +7,24 @@ description: Sistema completo de tags con categorías y MySQL
 
 commands:
     tag:
-        description: Comando principal de tags
-        usage: /<command> [args]
+        description: Comando principal de tags - Abre el GUI de selección de tags
+        usage: /<command>
         aliases: [tags]
     category:
-        description: Comando para gestionar categorías
-        usage: /<command> [args]
+        description: Comando para gestionar categorías - Abre el GUI de categorías (Solo OP)
+        usage: /<command>
         aliases: [categorias, cat]
+        permission: op
+    grvTags:
+        description: Comando de administración del plugin
+        usage: /<command> [reload|info|database|help]
+        aliases: [grvtags, grv]
+        permission: op
+
+permissions:
+    grvtags.admin:
+        description: Acceso completo a comandos de administración
+        default: op
+    grvtags.use:
+        description: Uso básico del plugin (comando /tags)
+        default: true

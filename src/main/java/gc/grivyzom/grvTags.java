@@ -1,5 +1,8 @@
 package gc.grivyzom;
 
+import gc.grivyzom.commands.AdminCommand;
+import gc.grivyzom.commands.CategoryCommand;
+import gc.grivyzom.commands.TagCommand;
 import gc.grivyzom.database.DatabaseManager;
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
@@ -137,10 +140,23 @@ public class grvTags extends JavaPlugin {
      * Registra todos los comandos del plugin
      */
     private void registerCommands() {
-        // Placeholder para registro de comandos
-        // getCommand("tag").setExecutor(new TagCommand());
-        // getCommand("category").setExecutor(new CategoryCommand());
+        // Registrar comando /tags
+        TagCommand tagCommand = new TagCommand(this);
+        getCommand("tag").setExecutor(tagCommand);
+
+        // Registrar comando /categories
+        CategoryCommand categoryCommand = new CategoryCommand(this);
+        getCommand("category").setExecutor(categoryCommand);
+
+        // Registrar comando admin /grvTags
+        AdminCommand adminCommand = new AdminCommand(this);
+        getCommand("grvTags").setExecutor(adminCommand);
+        getCommand("grvTags").setTabCompleter(adminCommand);
+
         getLogger().info("Comandos registrados correctamente");
+        getLogger().info("- /tags - Comando para abrir GUI de tags (Default)");
+        getLogger().info("- /categories - Comando para abrir GUI de categorías (OP)");
+        getLogger().info("- /grvTags - Comando de administración (OP)");
     }
 
     /**
