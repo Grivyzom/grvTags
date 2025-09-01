@@ -65,6 +65,13 @@ public class AdminCommand implements CommandExecutor, TabCompleter {
             case "createcategory":
                 handleCreateCategory(sender, args);
                 break;
+            case "delete":
+            case "deletetag":
+                handleDeleteTag(sender, args);
+                break;
+            case "deletecategory":
+                handleDeleteCategory(sender, args);
+                break;
             case "editor":
                 handleEditor(sender, args);
                 break;
@@ -104,7 +111,8 @@ public class AdminCommand implements CommandExecutor, TabCompleter {
         // Primer argumento: subcomandos principales
         if (args.length == 1) {
             List<String> subCommands = Arrays.asList(
-                    "reload", "info", "database", "create", "createcategory", "editor",
+                    "reload", "info", "database", "create", "createcategory",
+                    "delete", "deletetag", "deletecategory", "editor",
                     "give", "take", "set", "check", "help"
             );
 
@@ -125,6 +133,11 @@ public class AdminCommand implements CommandExecutor, TabCompleter {
                 return handleCreateTabComplete(args);
             case "createcategory":
                 return handleCreateCategoryTabComplete(args);
+            case "delete":
+            case "deletetag":
+                return handleDeleteTagTabComplete(args);
+            case "deletecategory":
+                return handleDeleteCategoryTabComplete(args);
             case "editor":
                 return handleEditorTabComplete(args);
             case "give":
@@ -137,6 +150,400 @@ public class AdminCommand implements CommandExecutor, TabCompleter {
                 return completions;
         }
     }
+
+    /**
+     * Maneja el comando delete/deletetag para eliminar tags
+     */
+    private void handleDeleteTag(CommandSender sender, String[] args) {
+        if (args.length < 2) {
+            sender.sendMessage(colorize(PREFIX + "&cUso incorrecto. Sintaxis:"));
+            sender.sendMessage(colorize(PREFIX + "&f/grvtags delete <tag>"));
+            sender.sendMessage(colorize(PREFIX + "&f/grvtags deletetag <tag>"));
+            sender.sendMessage(colorize(PREFIX + "&7Ejemplo: &f/grvtags delete vip"));
+            sender.sendMessage(colorize(PREFIX + "&c⚠ ¡Esta acción eliminará el tag permanentemente!"));
+            return;
+        }
+
+        String tagName = args[1];
+
+        // Verificar que el tag existe
+        if (!TagManager.tagExists(tagName)) {
+            sender.sendMessage(colorize(PREFIX + "&cEl tag '&f" + tagName + "&c' no existe."));
+            sender.sendMessage(colorize(PREFIX + "&7Tags disponibles: &f" + String.join(", ", TagManager.getAllTagNames())));
+            return;
+        }
+
+        // Verificar si es el tag default
+        if (tagName.equalsIgnoreCase("default")) {
+            sender.sendMessage(colorize(PREFIX + "&cNo se puede eliminar el tag 'default' ya que es obligatorio."));
+            return;
+        }
+
+        // Mostrar advertencia y pedir confirmación
+        if (args.length < 3 || !args[2].equalsIgnoreCase("confirm")) {
+            sender.sendMessage(colorize("&c&l⚠ ADVERTENCIA DE ELIMINACIÓN DE TAG"));
+            sender.sendMessage(colorize(""));
+            sender.sendMessage(colorize(PREFIX + "&7Estás a punto de eliminar el tag: &f" + tagName));
+            sender.sendMessage(colorize(""));
+            sender.sendMessage(colorize(PREFIX + "&c&lEsto hará lo siguiente:"));
+            sender.sendMessage(colorize(PREFIX + "&7• Eliminará el tag de la base de datos"));
+            sender.sendMessage(colorize(PREFIX + "&7• Quitará el tag de todos los jugadores que lo tengan"));
+            sender.sendMessage(colorize(PREFIX + "&7• Los jugadores que lo tenían activo volverán al default"));
+            sender.sendMessage(colorize(PREFIX + "&7• Esta acción NO se puede deshacer"));
+            sender.sendMessage(colorize(""));
+            sender.sendMessage(colorize(PREFIX + "&7Para confirmar, ejecuta:"));
+            sender.sendMessage(colorize(PREFIX + "&f/grvtags delete " + tagName + " confirm"));
+            return;
+        }
+
+        try {
+            // Obtener información del tag antes de eliminarlo
+            var tag = TagManager.getTag(tagName);
+            if (tag == null) {
+                sender.sendMessage(colorize(PREFIX + "&cError: Tag no encontrado en la base de datos."));
+                return;
+            }
+
+            sender.sendMessage(colorize(PREFIX + "&7Eliminando tag '&f" + tagName + "&7'..."));
+
+            // Contar jugadores afectados antes de eliminar
+            int playersWithTag = countPlayersWithTag(tagName);
+            int playersWithActiveTag = countPlayersWithActiveTag(tagName);
+            int totalUnlocks = countTagUnlocks(tagName);
+
+            if (playersWithTag > 0 || playersWithActiveTag > 0 || totalUnlocks > 0) {
+                sender.sendMessage(colorize(PREFIX + "&7Estadísticas del tag:"));
+                sender.sendMessage(colorize(PREFIX + "&7• Jugadores con tag activo: &f" + playersWithActiveTag));
+                sender.sendMessage(colorize(PREFIX + "&7• Total de desbloqueos: &f" + totalUnlocks));
+                sender.sendMessage(colorize(""));
+            }
+
+            // Resetear tags activos de jugadores que usan este tag
+            if (playersWithActiveTag > 0) {
+                sender.sendMessage(colorize(PREFIX + "&71. Reseteando tags activos..."));
+                resetActiveTagsForTag(tagName);
+                sender.sendMessage(colorize(PREFIX + "&a✓ &f" + playersWithActiveTag + " &7jugadores cambiados al tag default"));
+            }
+
+            // Eliminar tags desbloqueados
+            if (totalUnlocks > 0) {
+                sender.sendMessage(colorize(PREFIX + "&72. Eliminando desbloqueos..."));
+                removeUnlockedTagsForTag(tagName);
+                sender.sendMessage(colorize(PREFIX + "&a✓ &f" + totalUnlocks + " &7desbloqueos eliminados"));
+            }
+
+            // Eliminar el tag de la base de datos
+            sender.sendMessage(colorize(PREFIX + "&73. Eliminando tag de la base de datos..."));
+            if (TagManager.deleteTag(tagName)) {
+                sender.sendMessage(colorize(PREFIX + "&a✓ &7Tag eliminado de la base de datos"));
+
+                // Resumen final
+                sender.sendMessage(colorize("&8&m----------------------------------------"));
+                sender.sendMessage(colorize(PREFIX + "&a&l¡TAG ELIMINADO EXITOSAMENTE!"));
+                sender.sendMessage(colorize("&8&m----------------------------------------"));
+                sender.sendMessage(colorize("&7Tag eliminado: &f" + tagName));
+                sender.sendMessage(colorize("&7Categoría: &f" + tag.getCategory()));
+                if (playersWithActiveTag > 0) {
+                    sender.sendMessage(colorize("&7Jugadores afectados: &f" + playersWithActiveTag + " &7(cambiados a default)"));
+                }
+                if (totalUnlocks > 0) {
+                    sender.sendMessage(colorize("&7Desbloqueos eliminados: &f" + totalUnlocks));
+                }
+                sender.sendMessage(colorize("&8&m----------------------------------------"));
+
+                plugin.getLogger().info("Tag '" + tagName + "' eliminado por " + sender.getName() +
+                        " (afectó a " + playersWithActiveTag + " jugadores activos, " + totalUnlocks + " desbloqueos)");
+
+            } else {
+                sender.sendMessage(colorize(PREFIX + "&c✗ &7Error al eliminar el tag de la base de datos"));
+            }
+
+        } catch (Exception e) {
+            sender.sendMessage(colorize(PREFIX + "&c¡Error al eliminar el tag!"));
+            sender.sendMessage(colorize(PREFIX + "&cError: &f" + e.getMessage()));
+            plugin.getLogger().severe("Error al eliminar tag '" + tagName + "': " + e.getMessage());
+            e.printStackTrace();
+        }
+    }
+
+    /**
+     * Maneja el comando deletecategory para eliminar categorías
+     */
+    private void handleDeleteCategory(CommandSender sender, String[] args) {
+        if (args.length < 2) {
+            sender.sendMessage(colorize(PREFIX + "&cUso incorrecto. Sintaxis:"));
+            sender.sendMessage(colorize(PREFIX + "&f/grvtags deletecategory <categoria>"));
+            sender.sendMessage(colorize(PREFIX + "&7Ejemplo: &f/grvtags deletecategory premium"));
+            sender.sendMessage(colorize(PREFIX + "&c⚠ ¡Esta acción eliminará la categoría permanentemente!"));
+            return;
+        }
+
+        String categoryName = args[1];
+
+        // Verificar que la categoría existe
+        if (!CategoryManager.categoryExists(categoryName)) {
+            sender.sendMessage(colorize(PREFIX + "&cLa categoría '&f" + categoryName + "&c' no existe."));
+            sender.sendMessage(colorize(PREFIX + "&7Categorías disponibles: &f" + String.join(", ", CategoryManager.getAllCategoryNames())));
+            return;
+        }
+
+        // Verificar si es la categoría default
+        if (categoryName.equalsIgnoreCase("default")) {
+            sender.sendMessage(colorize(PREFIX + "&cNo se puede eliminar la categoría 'default' ya que es obligatoria."));
+            return;
+        }
+
+        // Verificar si la categoría tiene tags
+        var tagsInCategory = TagManager.getTagsByCategory(categoryName);
+        if (!tagsInCategory.isEmpty()) {
+            sender.sendMessage(colorize(PREFIX + "&cNo se puede eliminar la categoría '&f" + categoryName + "&c' porque contiene tags."));
+            sender.sendMessage(colorize(""));
+            sender.sendMessage(colorize(PREFIX + "&7Tags en esta categoría (&f" + tagsInCategory.size() + "&7):"));
+
+            StringBuilder tagsList = new StringBuilder();
+            for (int i = 0; i < tagsInCategory.size(); i++) {
+                if (i > 0) tagsList.append("&7, ");
+                tagsList.append("&f").append(tagsInCategory.get(i).getName());
+
+                // Saltar línea cada 5 tags para mejor legibilidad
+                if ((i + 1) % 5 == 0 && i < tagsInCategory.size() - 1) {
+                    sender.sendMessage(colorize(PREFIX + "&7• " + tagsList));
+                    tagsList = new StringBuilder();
+                }
+            }
+
+            if (tagsList.length() > 0) {
+                sender.sendMessage(colorize(PREFIX + "&7• " + tagsList));
+            }
+
+            sender.sendMessage(colorize(""));
+            sender.sendMessage(colorize(PREFIX + "&7Debes eliminar o mover estos tags primero:"));
+            sender.sendMessage(colorize(PREFIX + "&7• Para eliminar un tag: &f/grvtags delete <tag>"));
+            sender.sendMessage(colorize(PREFIX + "&7• Para mover tags, edita el archivo tags.yml"));
+            return;
+        }
+
+        // Mostrar advertencia y pedir confirmación
+        if (args.length < 3 || !args[2].equalsIgnoreCase("confirm")) {
+            sender.sendMessage(colorize("&c&l⚠ ADVERTENCIA DE ELIMINACIÓN DE CATEGORÍA"));
+            sender.sendMessage(colorize(""));
+            sender.sendMessage(colorize(PREFIX + "&7Estás a punto de eliminar la categoría: &f" + categoryName));
+            sender.sendMessage(colorize(""));
+            sender.sendMessage(colorize(PREFIX + "&c&lEsto hará lo siguiente:"));
+            sender.sendMessage(colorize(PREFIX + "&7• Eliminará la categoría de la base de datos"));
+            sender.sendMessage(colorize(PREFIX + "&7• La categoría desaparecerá del menú principal"));
+            sender.sendMessage(colorize(PREFIX + "&7• Esta acción NO se puede deshacer"));
+            sender.sendMessage(colorize(""));
+            sender.sendMessage(colorize(PREFIX + "&7Para confirmar, ejecuta:"));
+            sender.sendMessage(colorize(PREFIX + "&f/grvtags deletecategory " + categoryName + " confirm"));
+            return;
+        }
+
+        try {
+            // Obtener información de la categoría antes de eliminarla
+            var category = CategoryManager.getCategory(categoryName);
+            if (category == null) {
+                sender.sendMessage(colorize(PREFIX + "&cError: Categoría no encontrada en la base de datos."));
+                return;
+            }
+
+            sender.sendMessage(colorize(PREFIX + "&7Eliminando categoría '&f" + categoryName + "&7'..."));
+
+            // Eliminar la categoría
+            if (CategoryManager.deleteCategory(categoryName)) {
+                sender.sendMessage(colorize("&8&m----------------------------------------"));
+                sender.sendMessage(colorize(PREFIX + "&a&l¡CATEGORÍA ELIMINADA EXITOSAMENTE!"));
+                sender.sendMessage(colorize("&8&m----------------------------------------"));
+                sender.sendMessage(colorize("&7Categoría eliminada: &f" + categoryName));
+                sender.sendMessage(colorize("&7Nombre de display: " + category.getFormattedDisplayName()));
+                sender.sendMessage(colorize("&7Slot que ocupaba: &f" + category.getSlotPosition()));
+                sender.sendMessage(colorize("&8&m----------------------------------------"));
+
+                plugin.getLogger().info("Categoría '" + categoryName + "' eliminada por " + sender.getName());
+
+            } else {
+                sender.sendMessage(colorize(PREFIX + "&c¡Error al eliminar la categoría!"));
+                sender.sendMessage(colorize(PREFIX + "&7Verifica que la categoría no tenga tags asociados."));
+            }
+
+        } catch (Exception e) {
+            sender.sendMessage(colorize(PREFIX + "&c¡Error al eliminar la categoría!"));
+            sender.sendMessage(colorize(PREFIX + "&cError: &f" + e.getMessage()));
+            plugin.getLogger().severe("Error al eliminar categoría '" + categoryName + "': " + e.getMessage());
+            e.printStackTrace();
+        }
+    }
+
+    /**
+     * Autocompletado para el comando delete/deletetag
+     */
+    private List<String> handleDeleteTagTabComplete(String[] args) {
+        List<String> completions = new ArrayList<>();
+
+        if (args.length == 2) {
+            // Segundo argumento: nombres de tags (excluyendo default)
+            List<String> tagNames = TagManager.getAllTagNames();
+            String partial = args[1].toLowerCase();
+
+            for (String tagName : tagNames) {
+                if (!tagName.equalsIgnoreCase("default") && tagName.toLowerCase().startsWith(partial)) {
+                    completions.add(tagName);
+                }
+            }
+        } else if (args.length == 3) {
+            // Tercer argumento: confirm
+            if ("confirm".startsWith(args[2].toLowerCase())) {
+                completions.add("confirm");
+            }
+        }
+
+        return completions;
+    }
+
+    /**
+     * Autocompletado para el comando deletecategory
+     */
+    private List<String> handleDeleteCategoryTabComplete(String[] args) {
+        List<String> completions = new ArrayList<>();
+
+        if (args.length == 2) {
+            // Segundo argumento: nombres de categorías (excluyendo default)
+            List<String> categoryNames = CategoryManager.getAllCategoryNames();
+            String partial = args[1].toLowerCase();
+
+            for (String categoryName : categoryNames) {
+                if (!categoryName.equalsIgnoreCase("default") && categoryName.toLowerCase().startsWith(partial)) {
+                    completions.add(categoryName);
+                }
+            }
+        } else if (args.length == 3) {
+            // Tercer argumento: confirm
+            if ("confirm".startsWith(args[2].toLowerCase())) {
+                completions.add("confirm");
+            }
+        }
+
+        return completions;
+    }
+
+    // =================== MÉTODOS AUXILIARES PARA ELIMINACIÓN ===================
+
+    /**
+     * Cuenta jugadores que tienen un tag específico como tag activo
+     */
+    private int countPlayersWithActiveTag(String tagName) {
+        try {
+            Connection conn = DatabaseManager.getConnection();
+            if (conn == null) return 0;
+
+            String query = "SELECT COUNT(*) FROM grvtags_player_data WHERE current_tag = ?";
+            PreparedStatement stmt = conn.prepareStatement(query);
+            stmt.setString(1, tagName);
+
+            var rs = stmt.executeQuery();
+            int count = rs.next() ? rs.getInt(1) : 0;
+
+            rs.close();
+            stmt.close();
+            return count;
+
+        } catch (Exception e) {
+            plugin.getLogger().log(Level.SEVERE, "Error al contar jugadores con tag activo:", e);
+            return 0;
+        }
+    }
+
+    /**
+     * Cuenta total de jugadores que tienen un tag desbloqueado
+     */
+    private int countPlayersWithTag(String tagName) {
+        try {
+            Connection conn = DatabaseManager.getConnection();
+            if (conn == null) return 0;
+
+            String query = "SELECT COUNT(DISTINCT player_uuid) FROM grvtags_unlocked_tags WHERE tag_name = ?";
+            PreparedStatement stmt = conn.prepareStatement(query);
+            stmt.setString(1, tagName);
+
+            var rs = stmt.executeQuery();
+            int count = rs.next() ? rs.getInt(1) : 0;
+
+            rs.close();
+            stmt.close();
+            return count;
+
+        } catch (Exception e) {
+            plugin.getLogger().log(Level.SEVERE, "Error al contar jugadores con tag:", e);
+            return 0;
+        }
+    }
+
+    /**
+     * Cuenta total de desbloqueos de un tag
+     */
+    private int countTagUnlocks(String tagName) {
+        try {
+            Connection conn = DatabaseManager.getConnection();
+            if (conn == null) return 0;
+
+            String query = "SELECT COUNT(*) FROM grvtags_unlocked_tags WHERE tag_name = ?";
+            PreparedStatement stmt = conn.prepareStatement(query);
+            stmt.setString(1, tagName);
+
+            var rs = stmt.executeQuery();
+            int count = rs.next() ? rs.getInt(1) : 0;
+
+            rs.close();
+            stmt.close();
+            return count;
+
+        } catch (Exception e) {
+            plugin.getLogger().log(Level.SEVERE, "Error al contar desbloqueos de tag:", e);
+            return 0;
+        }
+    }
+
+    /**
+     * Resetea el tag activo de todos los jugadores que usan un tag específico
+     */
+    private void resetActiveTagsForTag(String tagName) {
+        try {
+            Connection conn = DatabaseManager.getConnection();
+            if (conn == null) return;
+
+            String query = "UPDATE grvtags_player_data SET current_tag = NULL WHERE current_tag = ?";
+            PreparedStatement stmt = conn.prepareStatement(query);
+            stmt.setString(1, tagName);
+
+            stmt.executeUpdate();
+            stmt.close();
+
+        } catch (Exception e) {
+            plugin.getLogger().log(Level.SEVERE, "Error al resetear tags activos:", e);
+        }
+    }
+
+    /**
+     * Elimina todos los desbloqueos de un tag específico
+     */
+    private void removeUnlockedTagsForTag(String tagName) {
+        try {
+            Connection conn = DatabaseManager.getConnection();
+            if (conn == null) return;
+
+            String query = "DELETE FROM grvtags_unlocked_tags WHERE tag_name = ?";
+            PreparedStatement stmt = conn.prepareStatement(query);
+            stmt.setString(1, tagName);
+
+            stmt.executeUpdate();
+            stmt.close();
+
+        } catch (Exception e) {
+            plugin.getLogger().log(Level.SEVERE, "Error al eliminar desbloqueos de tag:", e);
+        }
+    }
+
+    // =================== MÉTODOS EXISTENTES (sin cambios) ===================
 
     /**
      * Autocompletado para comandos que requieren jugador y tag
@@ -595,6 +1002,7 @@ public class AdminCommand implements CommandExecutor, TabCompleter {
             e.printStackTrace();
         }
     }
+
     private void handleInfo(CommandSender sender) {
         sender.sendMessage(colorize("&8&m----------------------------------------"));
         sender.sendMessage(colorize("&6&l              grvTags Info"));
@@ -904,17 +1312,31 @@ public class AdminCommand implements CommandExecutor, TabCompleter {
         sender.sendMessage(colorize("&f/grvTags reload &8- &7Recarga las configuraciones"));
         sender.sendMessage(colorize("&f/grvTags info &8- &7Información del plugin"));
         sender.sendMessage(colorize("&f/grvTags database &8- &7Estado de la base de datos"));
+        sender.sendMessage(colorize(""));
+        sender.sendMessage(colorize("&6&lCreación:"));
         sender.sendMessage(colorize("&f/grvTags create <nombre> <categoria> &8- &7Crear un tag"));
         sender.sendMessage(colorize("&f/grvTags createcategory <nombre> &8- &7Crear una categoría"));
+        sender.sendMessage(colorize(""));
+        sender.sendMessage(colorize("&c&lEliminación:"));
+        sender.sendMessage(colorize("&f/grvTags delete <tag> [confirm] &8- &7Eliminar un tag"));
+        sender.sendMessage(colorize("&f/grvTags deletecategory <categoria> [confirm] &8- &7Eliminar una categoría"));
+        sender.sendMessage(colorize(""));
+        sender.sendMessage(colorize("&b&lEdición:"));
         sender.sendMessage(colorize("&f/grvTags editor <type> &8- &7Abrir editores GUI"));
         sender.sendMessage(colorize("&f/grvTags cleanup confirm &8- &7Limpiar BD completamente"));
         sender.sendMessage(colorize(""));
-        sender.sendMessage(colorize("&6&lComandos de Jugadores:"));
+        sender.sendMessage(colorize("&a&lComandos de Jugadores:"));
         sender.sendMessage(colorize("&f/grvTags give <jugador> <tag> &8- &7Dar un tag a un jugador"));
         sender.sendMessage(colorize("&f/grvTags take <jugador> <tag> &8- &7Quitar un tag de un jugador"));
         sender.sendMessage(colorize("&f/grvTags set <jugador> <tag|none> &8- &7Establecer tag activo"));
         sender.sendMessage(colorize("&f/grvTags check <jugador> &8- &7Ver información de un jugador"));
+        sender.sendMessage(colorize(""));
         sender.sendMessage(colorize("&f/grvTags help &8- &7Muestra esta ayuda"));
+        sender.sendMessage(colorize("&8&m----------------------------------------"));
+        sender.sendMessage(colorize("&e&l⚠ NUEVOS COMANDOS DE ELIMINACIÓN:"));
+        sender.sendMessage(colorize("&7• &fdelete/deletetag &7- Elimina un tag permanentemente"));
+        sender.sendMessage(colorize("&7• &fdeletecategory &7- Elimina una categoría vacía"));
+        sender.sendMessage(colorize("&7• Ambos requieren &fconfirm &7para evitar eliminaciones accidentales"));
         sender.sendMessage(colorize("&8&m----------------------------------------"));
     }
 
