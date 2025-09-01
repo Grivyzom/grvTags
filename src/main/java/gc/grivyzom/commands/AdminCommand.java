@@ -14,9 +14,12 @@ import org.bukkit.command.CommandSender;
 import org.bukkit.command.TabCompleter;
 import org.bukkit.entity.Player;
 
+import java.sql.Connection;
+import java.sql.PreparedStatement;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.logging.Level;
 import java.util.stream.Collectors;
 
 public class AdminCommand implements CommandExecutor, TabCompleter {
@@ -512,28 +515,78 @@ public class AdminCommand implements CommandExecutor, TabCompleter {
                 sender.sendMessage(colorize(PREFIX + "&a✓ &7Conexión de base de datos reinicializada"));
             } else {
                 sender.sendMessage(colorize(PREFIX + "&c✗ &7Error al reinicializar la base de datos"));
+                return;
             }
 
-            // ARREGLADO: Recargar desde archivos YAML primero, luego desde BD
-            CategoryManager.reloadCategoriesFromYaml();
-            sender.sendMessage(colorize(PREFIX + "&a✓ &7categories.yml recargado y sincronizado"));
+            // Mostrar estadísticas antes del reload
+            int categoriesBeforeReload = CategoryManager.getCategoryCount();
+            int tagsBeforeReload = TagManager.getTagCount();
 
+            // MEJORADO: Recargar desde archivos YAML primero, luego desde BD
+            sender.sendMessage(colorize(PREFIX + "&7Sincronizando categories.yml..."));
+            CategoryManager.reloadCategoriesFromYaml();
+            sender.sendMessage(colorize(PREFIX + "&a✓ &7categories.yml sincronizado con base de datos"));
+
+            sender.sendMessage(colorize(PREFIX + "&7Sincronizando tags.yml..."));
             TagManager.reloadTagsFromYaml();
-            sender.sendMessage(colorize(PREFIX + "&a✓ &7tags.yml recargado y sincronizado"));
+            sender.sendMessage(colorize(PREFIX + "&a✓ &7tags.yml sincronizado con base de datos"));
 
             // Recargar tag por defecto
             PlayerDataManager.reloadDefaultTag();
             sender.sendMessage(colorize(PREFIX + "&a✓ &7Tag por defecto recargado"));
 
+            // Mostrar estadísticas después del reload
+            int categoriesAfterReload = CategoryManager.getCategoryCount();
+            int tagsAfterReload = TagManager.getTagCount();
+
             long endTime = System.currentTimeMillis();
             long reloadTime = endTime - startTime;
 
+            // Resumen final mejorado
+            sender.sendMessage(colorize("&8&m----------------------------------------"));
             sender.sendMessage(colorize(PREFIX + "&a¡Recarga completada exitosamente!"));
-            sender.sendMessage(colorize(PREFIX + "&7Tiempo de recarga: &f" + reloadTime + "ms"));
-            sender.sendMessage(colorize(PREFIX + "&7Tags cargados: &f" + TagManager.getTagCount()));
-            sender.sendMessage(colorize(PREFIX + "&7Categorías cargadas: &f" + CategoryManager.getCategoryCount()));
+            sender.sendMessage(colorize("&8&m----------------------------------------"));
+
+            // Información detallada
+            sender.sendMessage(colorize("&6&lESTADÍSTICAS DE RECARGA:"));
+            sender.sendMessage(colorize("&7⏱ Tiempo de recarga: &f" + reloadTime + "ms"));
+            sender.sendMessage(colorize(""));
+
+            // Categorías
+            sender.sendMessage(colorize("&7📁 Categorías:"));
+            sender.sendMessage(colorize("&7  Antes: &f" + categoriesBeforeReload + " &7→ Después: &f" + categoriesAfterReload));
+
+            int categoryDifference = categoriesAfterReload - categoriesBeforeReload;
+            if (categoryDifference > 0) {
+                sender.sendMessage(colorize("&7  &a+" + categoryDifference + " &7nuevas categorías añadidas"));
+            } else if (categoryDifference < 0) {
+                sender.sendMessage(colorize("&7  &c" + Math.abs(categoryDifference) + " &7categorías eliminadas"));
+            } else {
+                sender.sendMessage(colorize("&7  &eSin cambios en categorías"));
+            }
+
+            sender.sendMessage(colorize(""));
+
+            // Tags
+            sender.sendMessage(colorize("&7🏷 Tags:"));
+            sender.sendMessage(colorize("&7  Antes: &f" + tagsBeforeReload + " &7→ Después: &f" + tagsAfterReload));
+
+            int tagDifference = tagsAfterReload - tagsBeforeReload;
+            if (tagDifference > 0) {
+                sender.sendMessage(colorize("&7  &a+" + tagDifference + " &7nuevos tags añadidos"));
+            } else if (tagDifference < 0) {
+                sender.sendMessage(colorize("&7  &c" + Math.abs(tagDifference) + " &7tags eliminados"));
+            } else {
+                sender.sendMessage(colorize("&7  &eSin cambios en tags"));
+            }
+
+            sender.sendMessage(colorize(""));
+            sender.sendMessage(colorize("&7🔄 Sistema: &aOperativo y sincronizado"));
+            sender.sendMessage(colorize("&7💾 Base de datos: &aActualizada"));
+            sender.sendMessage(colorize("&8&m----------------------------------------"));
 
             plugin.getLogger().info("Configuraciones recargadas por " + sender.getName() + " (" + reloadTime + "ms)");
+            plugin.getLogger().info("Resultado: " + categoriesAfterReload + " categorías, " + tagsAfterReload + " tags");
 
         } catch (Exception e) {
             sender.sendMessage(colorize(PREFIX + "&c¡Error durante la recarga!"));
@@ -542,7 +595,6 @@ public class AdminCommand implements CommandExecutor, TabCompleter {
             e.printStackTrace();
         }
     }
-
     private void handleInfo(CommandSender sender) {
         sender.sendMessage(colorize("&8&m----------------------------------------"));
         sender.sendMessage(colorize("&6&l              grvTags Info"));
@@ -706,10 +758,142 @@ public class AdminCommand implements CommandExecutor, TabCompleter {
             case "tags":
                 openTagsOverview(player);
                 break;
+            case "cleanup":
+                handleCleanup(sender, args);
+                break;
             default:
                 sender.sendMessage(colorize(PREFIX + "&cTipo de editor desconocido: &f" + editorType));
                 sender.sendMessage(colorize(PREFIX + "&7Tipos disponibles: &fcategory&7, &ftag&7, &ftags"));
                 break;
+        }
+    }
+
+    private void cleanupCategoriesNotInYaml() {
+        try {
+            Connection conn = DatabaseManager.getConnection();
+            if (conn == null) return;
+
+            // Eliminar todas las categorías que no están marcadas como from_yaml
+            String deleteQuery = """
+            DELETE FROM grvtags_categories 
+            WHERE id NOT IN (
+                SELECT id FROM (
+                    SELECT id FROM grvtags_categories 
+                    WHERE is_from_yaml = TRUE OR is_from_yaml IS NULL
+                ) AS temp
+            )
+        """;
+
+            PreparedStatement stmt = conn.prepareStatement(deleteQuery);
+            int deletedCount = stmt.executeUpdate();
+            stmt.close();
+
+            plugin.getLogger().info("Limpieza: " + deletedCount + " categorías eliminadas de la BD");
+
+        } catch (Exception e) {
+            plugin.getLogger().log(Level.SEVERE, "Error al limpiar categorías:", e);
+        }
+    }
+
+
+    private void handleCleanup(CommandSender sender, String[] args) {
+        if (args.length < 2 || !args[1].equalsIgnoreCase("confirm")) {
+            sender.sendMessage(colorize(PREFIX + "&c&l⚠ COMANDO DE LIMPIEZA TOTAL"));
+            sender.sendMessage(colorize(""));
+            sender.sendMessage(colorize(PREFIX + "&7Este comando eliminará TODAS las categorías y tags"));
+            sender.sendMessage(colorize(PREFIX + "&7de la base de datos que NO estén en los archivos YAML."));
+            sender.sendMessage(colorize(""));
+            sender.sendMessage(colorize(PREFIX + "&c&lADVERTENCIA:"));
+            sender.sendMessage(colorize(PREFIX + "&7- Se eliminará cualquier categoría/tag no presente en YAML"));
+            sender.sendMessage(colorize(PREFIX + "&7- Los datos de jugadores se mantendrán seguros"));
+            sender.sendMessage(colorize(PREFIX + "&7- Esta acción NO se puede deshacer"));
+            sender.sendMessage(colorize(""));
+            sender.sendMessage(colorize(PREFIX + "&7Para confirmar, ejecuta:"));
+            sender.sendMessage(colorize(PREFIX + "&f/grvtags cleanup confirm"));
+            return;
+        }
+
+        sender.sendMessage(colorize(PREFIX + "&7Iniciando limpieza completa de la base de datos..."));
+
+        try {
+            long startTime = System.currentTimeMillis();
+
+            // Estadísticas antes de la limpieza
+            int categoriesBeforeCleanup = CategoryManager.getCategoryCount();
+            int tagsBeforeCleanup = TagManager.getTagCount();
+
+            sender.sendMessage(colorize(PREFIX + "&7Estado actual:"));
+            sender.sendMessage(colorize(PREFIX + "&7- Categorías en BD: &f" + categoriesBeforeCleanup));
+            sender.sendMessage(colorize(PREFIX + "&7- Tags en BD: &f" + tagsBeforeCleanup));
+            sender.sendMessage(colorize(""));
+
+            // Paso 1: Limpiar categorías que no están en el YAML
+            sender.sendMessage(colorize(PREFIX + "&71. Limpiando categorías..."));
+            cleanupCategoriesNotInYaml();
+            sender.sendMessage(colorize(PREFIX + "&a✓ &7Categorías limpiadas"));
+
+            // Paso 2: Limpiar tags que no están en el YAML
+            sender.sendMessage(colorize(PREFIX + "&72. Limpiando tags..."));
+            cleanupTagsNotInYaml();
+            sender.sendMessage(colorize(PREFIX + "&a✓ &7Tags limpiados"));
+
+            // Paso 3: Forzar recarga completa desde YAML
+            sender.sendMessage(colorize(PREFIX + "&73. Recargando desde YAML..."));
+            CategoryManager.reloadCategoriesFromYaml();
+            TagManager.reloadTagsFromYaml();
+            PlayerDataManager.reloadDefaultTag();
+            sender.sendMessage(colorize(PREFIX + "&a✓ &7Recarga desde YAML completada"));
+
+            // Estadísticas después de la limpieza
+            int categoriesAfterCleanup = CategoryManager.getCategoryCount();
+            int tagsAfterCleanup = TagManager.getTagCount();
+
+            long endTime = System.currentTimeMillis();
+            long cleanupTime = endTime - startTime;
+
+            // Resumen final
+            sender.sendMessage(colorize("&8&m----------------------------------------"));
+            sender.sendMessage(colorize(PREFIX + "&a&l¡LIMPIEZA COMPLETADA!"));
+            sender.sendMessage(colorize("&8&m----------------------------------------"));
+            sender.sendMessage(colorize("&7⏱ Tiempo: &f" + cleanupTime + "ms"));
+            sender.sendMessage(colorize(""));
+
+            sender.sendMessage(colorize("&7📁 Categorías:"));
+            sender.sendMessage(colorize("&7  Antes: &f" + categoriesBeforeCleanup + " &7→ Después: &f" + categoriesAfterCleanup));
+
+            sender.sendMessage(colorize(""));
+            sender.sendMessage(colorize("&7🏷 Tags:"));
+            sender.sendMessage(colorize("&7  Antes: &f" + tagsBeforeCleanup + " &7→ Después: &f" + tagsAfterCleanup));
+
+            int categoriesRemoved = categoriesBeforeCleanup - categoriesAfterCleanup;
+            int tagsRemoved = tagsBeforeCleanup - tagsAfterCleanup;
+
+            sender.sendMessage(colorize(""));
+            if (categoriesRemoved > 0 || tagsRemoved > 0) {
+                sender.sendMessage(colorize("&c📊 Elementos eliminados:"));
+                if (categoriesRemoved > 0) {
+                    sender.sendMessage(colorize("&7  - &c" + categoriesRemoved + " &7categorías eliminadas"));
+                }
+                if (tagsRemoved > 0) {
+                    sender.sendMessage(colorize("&7  - &c" + tagsRemoved + " &7tags eliminados"));
+                }
+            } else {
+                sender.sendMessage(colorize("&a✅ No se encontraron elementos para eliminar"));
+            }
+
+            sender.sendMessage(colorize(""));
+            sender.sendMessage(colorize("&7🔄 La base de datos ahora coincide exactamente con"));
+            sender.sendMessage(colorize("&7   los archivos categories.yml y tags.yml"));
+            sender.sendMessage(colorize("&8&m----------------------------------------"));
+
+            plugin.getLogger().info("Limpieza completa ejecutada por " + sender.getName() + " (" + cleanupTime + "ms)");
+            plugin.getLogger().info("Elementos eliminados: " + categoriesRemoved + " categorías, " + tagsRemoved + " tags");
+
+        } catch (Exception e) {
+            sender.sendMessage(colorize(PREFIX + "&c¡Error durante la limpieza!"));
+            sender.sendMessage(colorize(PREFIX + "&cError: &f" + e.getMessage()));
+            plugin.getLogger().severe("Error durante la limpieza ejecutada por " + sender.getName() + ": " + e.getMessage());
+            e.printStackTrace();
         }
     }
 
@@ -723,6 +907,7 @@ public class AdminCommand implements CommandExecutor, TabCompleter {
         sender.sendMessage(colorize("&f/grvTags create <nombre> <categoria> &8- &7Crear un tag"));
         sender.sendMessage(colorize("&f/grvTags createcategory <nombre> &8- &7Crear una categoría"));
         sender.sendMessage(colorize("&f/grvTags editor <type> &8- &7Abrir editores GUI"));
+        sender.sendMessage(colorize("&f/grvTags cleanup confirm &8- &7Limpiar BD completamente"));
         sender.sendMessage(colorize(""));
         sender.sendMessage(colorize("&6&lComandos de Jugadores:"));
         sender.sendMessage(colorize("&f/grvTags give <jugador> <tag> &8- &7Dar un tag a un jugador"));
@@ -763,6 +948,66 @@ public class AdminCommand implements CommandExecutor, TabCompleter {
 
         // Solo letras, números y guiones bajos
         return name.matches("^[a-zA-Z0-9_]+$");
+    }
+
+    private void cleanupTagsNotInYaml() {
+        try {
+            Connection conn = DatabaseManager.getConnection();
+            if (conn == null) return;
+
+            // Primero, resetear tags activos de jugadores que van a ser eliminados
+            String resetPlayerTagsQuery = """
+            UPDATE grvtags_player_data 
+            SET current_tag = NULL 
+            WHERE current_tag IN (
+                SELECT name FROM grvtags_tags 
+                WHERE (is_from_yaml = FALSE OR is_from_yaml IS NULL) 
+                AND name != 'default'
+            )
+        """;
+
+            PreparedStatement resetStmt = conn.prepareStatement(resetPlayerTagsQuery);
+            int resetCount = resetStmt.executeUpdate();
+            resetStmt.close();
+
+            if (resetCount > 0) {
+                plugin.getLogger().info("Limpieza: " + resetCount + " jugadores tuvieron sus tags reseteados al default");
+            }
+
+            // Eliminar tags desbloqueados de jugadores para tags que van a ser eliminados
+            String deleteUnlockedQuery = """
+            DELETE FROM grvtags_unlocked_tags 
+            WHERE tag_name IN (
+                SELECT name FROM grvtags_tags 
+                WHERE (is_from_yaml = FALSE OR is_from_yaml IS NULL) 
+                AND name != 'default'
+            )
+        """;
+
+            PreparedStatement deleteUnlockedStmt = conn.prepareStatement(deleteUnlockedQuery);
+            int unlockedCount = deleteUnlockedStmt.executeUpdate();
+            deleteUnlockedStmt.close();
+
+            if (unlockedCount > 0) {
+                plugin.getLogger().info("Limpieza: " + unlockedCount + " tags desbloqueados eliminados");
+            }
+
+            // Finalmente, eliminar los tags que no están en YAML
+            String deleteTagsQuery = """
+            DELETE FROM grvtags_tags 
+            WHERE (is_from_yaml = FALSE OR is_from_yaml IS NULL) 
+            AND name != 'default'
+        """;
+
+            PreparedStatement deleteTagsStmt = conn.prepareStatement(deleteTagsQuery);
+            int deletedCount = deleteTagsStmt.executeUpdate();
+            deleteTagsStmt.close();
+
+            plugin.getLogger().info("Limpieza: " + deletedCount + " tags eliminados de la BD");
+
+        } catch (Exception e) {
+            plugin.getLogger().log(Level.SEVERE, "Error al limpiar tags:", e);
+        }
     }
 
     private boolean isValidCategoryName(String name) {

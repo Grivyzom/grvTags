@@ -29,6 +29,11 @@ public class DatabaseManager {
         plugin = pluginInstance;
         loadDatabaseConfig();
         connect();
+
+        // NUEVO: Ejecutar migraciones después de conectar
+        if (isConnected()) {
+            DatabaseMigrations.runMigrations(plugin);
+        }
     }
 
     /**

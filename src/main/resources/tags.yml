@@ -1,56 +1,175 @@
 ############################################################
 # +------------------------------------------------------+ #
-# |                       Tags                           | #
+# |                    TAGS DISPONIBLES                 | #
 # +------------------------------------------------------+ #
+# Este archivo define todos los tags del servidor
+# Solo los tags listados aquí estarán disponibles
 ############################################################
 
 tags:
-  default: # TAG que se muestra si no tienes ningún tag
-    tag: '&8[&7?&8]'
-    permission: '' # Sin permiso requerido para el tag default
-    description: '&7Tag por defecto para jugadores sin tag'
+
+  # =================== TAGS POR DEFECTO ===================
+
+  default: # TAG QUE SE MUESTRA SI NO TIENES NINGÚN TAG EQUIPADO
+    tag: '&8[&7👤&8]'
+    permission: '' # Sin permiso requerido
+    description: '&7Tag por defecto del servidor'
     category: 'default'
     order: 0
-    displayname: '&7Tag por defecto'
-    display-item: 'BARRIER'
-    cost: 0 # Gratis
+    displayname: '&7🏷️ Tag por Defecto'
+    display-item: 'GRAY_DYE'
+    cost: 0
 
-  hexsupport: # 1.16+ server is required for hex colors to work.
-    tag: '&8[&#afe4a4&lH&#b1cdb1&le&#b3b6bd&lx&#b59fca&lC&#b688d7&lo&#b871e3&ll&#ba5af0&lo&#bc43fd&lr&8]'
-    permission: 'grvtags.tag.hex'
-    description: '&7This plugin supports normal/hex colors'
+  jugador:
+    tag: '&8[&a&lJugador&8]'
+    permission: 'grvtags.tag.jugador'
+    description: '&7Tag básico para jugadores regulares'
     category: 'default'
     order: 1
-    displayname: '&7Tag: %tag%'
-    display-item: 'NAME_TAG'
-    cost: 200 # this is only implemented when 'cost-system' is enabled
-
-  santa: # Christmas themed tag, shows in the Xmas category.
-    tag: '&8[&c&lSanta&8]'
-    permission: 'grvtags.tag.santa'
-    description: '&7ho ho hooooooo!'
-    category: 'xmas'
-    order: 2
-    displayname: '&7Tag: %tag%'
-    display-item: 'NAME_TAG'
-    cost: 100 # setting this to 0 when 'cost-system' is enabled, will make this tag free.
-
-  example:
-    tag: '&8[&aExample&8]'
-    permission: 'grvtags.tag.example'
-    description: '&7Un tag de ejemplo'
-    category: 'default'
-    order: 3
-    displayname: '&7Tag: %tag%'
+    displayname: '&a🎮 Tag: %tag%'
     display-item: 'NAME_TAG'
     cost: 0
 
-  grivyzom:
-    tag: '&8[&6&lGrivyzom&8]'
-    permission: 'grvtags.tag.grivyzom'
-    description: '&7Tag especial del desarrollador'
+  veterano:
+    tag: '&8[&2&lVeterano&8]'
+    permission: 'grvtags.tag.veterano'
+    description: '&7Para jugadores con experiencia'
+    category: 'default'
+    order: 2
+    displayname: '&2⚔️ Tag: %tag%'
+    display-item: 'IRON_SWORD'
+    cost: 0
+
+  # =================== TAGS VIP ===================
+
+  vip:
+    tag: '&8[&6&lVIP&8]'
+    permission: 'grvtags.tag.vip'
+    description: '&6Tag exclusivo para miembros VIP'
     category: 'vip'
     order: 1
-    displayname: '&7Tag: %tag%'
+    displayname: '&6💎 Tag VIP: %tag%'
     display-item: 'DIAMOND'
     cost: 500
+
+  premium:
+    tag: '&8[&e&lPREMIUM&8]'
+    permission: 'grvtags.tag.premium'
+    description: '&eTag premium con beneficios especiales'
+    category: 'vip'
+    order: 2
+    displayname: '&e⭐ Tag Premium: %tag%'
+    display-item: 'GOLD_INGOT'
+    cost: 1000
+
+  elite:
+    tag: '&8[&5&lELITE&8]'
+    permission: 'grvtags.tag.elite'
+    description: '&5Tag para los jugadores más exclusivos'
+    category: 'vip'
+    order: 3
+    displayname: '&5👑 Tag Elite: %tag%'
+    display-item: 'NETHERITE_INGOT'
+    cost: 2000
+
+  # =================== TAGS DE STAFF ===================
+
+  helper:
+    tag: '&8[&b&lHelper&8]'
+    permission: 'grvtags.tag.helper'
+    description: '&bTag para ayudantes del servidor'
+    category: 'staff'
+    order: 1
+    displayname: '&b🛠️ Tag Staff: %tag%'
+    display-item: 'IRON_PICKAXE'
+    cost: 0
+
+  moderador:
+    tag: '&8[&9&lMod&8]'
+    permission: 'grvtags.tag.moderador'
+    description: '&9Tag para moderadores'
+    category: 'staff'
+    order: 2
+    displayname: '&9🛡️ Tag Staff: %tag%'
+    display-item: 'DIAMOND_CHESTPLATE'
+    cost: 0
+
+  admin:
+    tag: '&8[&c&lAdmin&8]'
+    permission: 'grvtags.tag.admin'
+    description: '&cTag para administradores'
+    category: 'staff'
+    order: 3
+    displayname: '&c⚡ Tag Staff: %tag%'
+    display-item: 'COMMAND_BLOCK'
+    cost: 0
+
+  owner:
+    tag: '&8[&4&lOWNER&8]'
+    permission: 'grvtags.tag.owner'
+    description: '&4Tag para el propietario del servidor'
+    category: 'staff'
+    order: 4
+    displayname: '&4👑 Tag Owner: %tag%'
+    display-item: 'DRAGON_HEAD'
+    cost: 0
+
+  # =================== TAGS ESPECIALES ===================
+
+  constructor:
+    tag: '&8[&6&lConstructor&8]'
+    permission: 'grvtags.tag.constructor'
+    description: '&7Para los mejores constructores'
+    category: 'special'
+    order: 1
+    displayname: '&6🏗️ Tag Especial: %tag%'
+    display-item: 'GOLDEN_PICKAXE'
+    cost: 0
+
+  pvper:
+    tag: '&8[&c&lPvPer&8]'
+    permission: 'grvtags.tag.pvper'
+    description: '&7Para guerreros experimentados'
+    category: 'special'
+    order: 2
+    displayname: '&c⚔️ Tag Especial: %tag%'
+    display-item: 'DIAMOND_SWORD'
+    cost: 0
+
+  explorador:
+    tag: '&8[&a&lExplorador&8]'
+    permission: 'grvtags.tag.explorador'
+    description: '&7Para aventureros intrépidos'
+    category: 'special'
+    order: 3
+    displayname: '&a🧭 Tag Especial: %tag%'
+    display-item: 'COMPASS'
+    cost: 0
+
+  leyenda:
+    tag: '&8[&d&l✨Leyenda✨&8]'
+    permission: 'grvtags.tag.leyenda'
+    description: '&dTag legendario solo para los mejores'
+    category: 'special'
+    order: 4
+    displayname: '&d⭐ Tag Legendario: %tag%'
+    display-item: 'ENCHANTED_GOLDEN_APPLE'
+    cost: 0
+
+############################################################
+# CONFIGURACIÓN DE TAGS:
+#
+# tag: El formato que aparece en el chat
+# permission: Permiso requerido para usar el tag
+# description: Descripción que aparece en el GUI
+# category: Debe coincidir con una categoría en categories.yml
+# order: Orden de aparición en la categoría (menor = primero)
+# displayname: Nombre que aparece en el GUI (%tag% = reemplaza por el tag)
+# display-item: Material del ítem en el GUI
+# cost: Precio del tag (0 = gratis)
+#
+# NOTAS:
+# - Solo los tags listados aquí estarán disponibles
+# - Usa /grvtags reload después de hacer cambios
+# - El tag 'default' es obligatorio y aparece cuando no tienes tag
+############################################################

@@ -1,46 +1,82 @@
 ############################################################
 # +------------------------------------------------------+ #
-# |                    Categories                        | #
+# |                CATEGORÍAS DE TAGS                   | #
 # +------------------------------------------------------+ #
+# Este archivo define todas las categorías disponibles
+# Solo las categorías listadas aquí aparecerán en el menú
 ############################################################
 
 categories:
+
+  # =================== CATEGORÍA POR DEFECTO ===================
   default:
-    title: '&8Default Tags (Page %page%)' # title of the category gui.
-    material: 'NAME_TAG' # item material.
-    id_display: '&7&lDefault Tags' # item displayname.
-    slot: 11 # slot this item will be in the main menu.
+    title: '&8Tags por Defecto (Página %page%)'
+    material: 'NAME_TAG'
+    id_display: '&7&lTags por Defecto'
+    slot: 11
     lore:
-      - '&8&m-----------------------------'
+      - '&8&m─────────────────────────────'
       - ''
-      - '&7Default tags: &7%tags_amount%'
+      - '&7📋 Tags básicos: &f%tags_amount%'
+      - '&7🎯 Disponibles para todos'
       - ''
-      - '&8&m-----------------------------'
-    permission: 'supremetags.category.default' # permission players will need to open this menu
-    permission-see-category: false # if set true and if player doesn't have the permission `supremetags.category.<category>` they will not see it.
+      - '&8&m─────────────────────────────'
+    permission: 'grvtags.category.default'
+    permission-see-category: false
+
+  # =================== CATEGORÍA VIP ===================
   vip:
-    title: '&8Rank Tags (Page %page%)' # title of the category gui.
-    material: 'NAME_TAG' # item material.
-    id_display: '&6&lRank Tags' # item displayname.
-    slot: 13 # slot this item will be in the main menu.
+    title: '&8Tags VIP (Página %page%)'
+    material: 'DIAMOND'
+    id_display: '&6&lTags VIP'
+    slot: 13
     lore:
-      - '&8&m-----------------------------'
+      - '&8&m─────────────────────────────'
       - ''
-      - '&6Rank tags: &7%tags_amount%'
+      - '&6💎 Tags VIP: &f%tags_amount%'
+      - '&7⭐ Exclusivos para VIPs'
       - ''
-      - '&8&m-----------------------------'
-    permission: 'supremetags.category.rank' # permission players will need to open this menu
-    permission-see-category: false # if set true and if player doesn't have the permission `supremetags.category.<category>` they will not see it.
-  xmas:
-    title: '&8Christmas Tags (Page %page%)' # title of the category gui.
-    material: 'NAME_TAG' # item material.
-    id_display: '&c&lChristmas Tags' # item displayname.
-    slot: 15 # slot this item will be in the main menu.
+      - '&8&m─────────────────────────────'
+    permission: 'grvtags.category.vip'
+    permission-see-category: false
+
+  # =================== CATEGORÍA STAFF ===================
+  staff:
+    title: '&8Tags de Staff (Página %page%)'
+    material: 'GOLDEN_APPLE'
+    id_display: '&c&lTags de Staff'
+    slot: 15
     lore:
-      - '&8&m-----------------------------'
+      - '&8&m─────────────────────────────'
       - ''
-      - '&cChristmas tags: &7%tags_amount%'
+      - '&c👑 Tags de Staff: &f%tags_amount%'
+      - '&7🛡️ Solo para el equipo'
       - ''
-      - '&8&m-----------------------------'
-    permission: 'supremetags.category.xmas' # permission players will need to open this menu
-    permission-see-category: false # if set true and if player doesn't have the permission `supremetags.category.<category>` they will not see it.
+      - '&8&m─────────────────────────────'
+    permission: 'grvtags.category.staff'
+    permission-see-category: true
+
+  # =================== CATEGORÍA ESPECIAL ===================
+  special:
+    title: '&8Tags Especiales (Página %page%)'
+    material: 'NETHER_STAR'
+    id_display: '&d&lTags Especiales'
+    slot: 20
+    lore:
+      - '&8&m─────────────────────────────'
+      - ''
+      - '&d✨ Tags especiales: &f%tags_amount%'
+      - '&7🎁 Eventos y logros únicos'
+      - ''
+      - '&8&m─────────────────────────────'
+    permission: 'grvtags.category.special'
+    permission-see-category: false
+
+############################################################
+# NOTAS IMPORTANTES:
+# - Solo las categorías listadas aquí aparecerán en el menú
+# - Usa /grvtags reload después de hacer cambios
+# - El material debe ser un Material válido de Minecraft
+# - Los permisos se generan automáticamente si no los especificas
+# - permission-see-category: true = solo se ve con el permiso
+############################################################
