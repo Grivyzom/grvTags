@@ -456,33 +456,81 @@ public class CategoryManager {
             Connection conn = DatabaseManager.getConnection();
             if (conn == null) return false;
 
-            // Verificar si la categoría tiene tags
-            String checkQuery = "SELECT COUNT(*) FROM grvtags_tags WHERE category = ?";
-            PreparedStatement checkStmt = conn.prepareStatement(checkQuery);
-            checkStmt.setString(1, name);
-            ResultSet rs = checkStmt.executeQuery();
+            plugin.getLogger().info("Iniciando eliminación de categoría '" + name + "'...");
 
-            rs.next();
-            int tagCount = rs.getInt(1);
-            rs.close();
-            checkStmt.close();
+            // 1. Obtener lista de tags en la categoría antes de eliminar
+            String getTagsQuery = "SELECT name FROM grvtags_tags WHERE category = ?";
+            PreparedStatement getTagsStmt = conn.prepareStatement(getTagsQuery);
+            getTagsStmt.setString(1, name);
+            ResultSet tagsRs = getTagsStmt.executeQuery();
 
-            if (tagCount > 0) {
-                plugin.getLogger().warning("No se puede eliminar la categoría '" + name + "' porque tiene " + tagCount + " tags asociados");
-                return false;
+            List<String> tagsToDelete = new ArrayList<>();
+            while (tagsRs.next()) {
+                tagsToDelete.add(tagsRs.getString("name"));
+            }
+            tagsRs.close();
+            getTagsStmt.close();
+
+            plugin.getLogger().info("Tags a eliminar: " + tagsToDelete.size());
+
+            // 2. Para cada tag, resetear jugadores que lo tengan activo
+            if (!tagsToDelete.isEmpty()) {
+                plugin.getLogger().info("Reseteando tags activos de jugadores...");
+
+                for (String tagName : tagsToDelete) {
+                    // Resetear tags activos
+                    String resetActiveQuery = "UPDATE grvtags_player_data SET current_tag = NULL WHERE current_tag = ?";
+                    PreparedStatement resetStmt = conn.prepareStatement(resetActiveQuery);
+                    resetStmt.setString(1, tagName);
+                    int resetCount = resetStmt.executeUpdate();
+                    resetStmt.close();
+
+                    if (resetCount > 0) {
+                        plugin.getLogger().info("- Tag '" + tagName + "': " + resetCount + " jugadores reseteados");
+                    }
+
+                    // Eliminar desbloqueos del tag
+                    String deleteUnlocksQuery = "DELETE FROM grvtags_unlocked_tags WHERE tag_name = ?";
+                    PreparedStatement deleteUnlocksStmt = conn.prepareStatement(deleteUnlocksQuery);
+                    deleteUnlocksStmt.setString(1, tagName);
+                    int unlocksDeleted = deleteUnlocksStmt.executeUpdate();
+                    deleteUnlocksStmt.close();
+
+                    if (unlocksDeleted > 0) {
+                        plugin.getLogger().info("- Tag '" + tagName + "': " + unlocksDeleted + " desbloqueos eliminados");
+                    }
+                }
             }
 
-            // Eliminar la categoría
-            String deleteQuery = "DELETE FROM grvtags_categories WHERE name = ?";
-            PreparedStatement stmt = conn.prepareStatement(deleteQuery);
-            stmt.setString(1, name);
+            // 3. Eliminar todos los tags de la categoría
+            String deleteTagsQuery = "DELETE FROM grvtags_tags WHERE category = ?";
+            PreparedStatement deleteTagsStmt = conn.prepareStatement(deleteTagsQuery);
+            deleteTagsStmt.setString(1, name);
+            int tagsDeleted = deleteTagsStmt.executeUpdate();
+            deleteTagsStmt.close();
 
-            int rowsAffected = stmt.executeUpdate();
-            stmt.close();
+            plugin.getLogger().info("Tags eliminados de la BD: " + tagsDeleted);
 
-            if (rowsAffected > 0) {
+            // 4. Eliminar la categoría
+            String deleteCategoryQuery = "DELETE FROM grvtags_categories WHERE name = ?";
+            PreparedStatement deleteCategoryStmt = conn.prepareStatement(deleteCategoryQuery);
+            deleteCategoryStmt.setString(1, name);
+            int categoryDeleted = deleteCategoryStmt.executeUpdate();
+            deleteCategoryStmt.close();
+
+            if (categoryDeleted > 0) {
+                plugin.getLogger().info("Categoría '" + name + "' eliminada de la BD");
+
+                // 5. NUEVO: Actualizar archivos YAML
+                updateYamlFilesAfterCategoryDeletion(name, tagsToDelete);
+
+                // 6. Actualizar cache
                 loadedCategories.remove(name.toLowerCase());
-                plugin.getLogger().info("Categoría '" + name + "' eliminada exitosamente");
+
+                // Forzar recarga del TagManager para actualizar cache
+                TagManager.forceReload();
+
+                plugin.getLogger().info("Eliminación de categoría '" + name + "' completada exitosamente");
                 return true;
             }
 
@@ -499,5 +547,97 @@ public class CategoryManager {
 
     public static List<String> getAllCategoryNames() {
         return new ArrayList<>(loadedCategories.keySet());
+    }
+
+
+    private static void updateYamlFilesAfterCategoryDeletion(String categoryName, List<String> deletedTags) {
+        try {
+            plugin.getLogger().info("Actualizando archivos YAML después de eliminar categoría '" + categoryName + "'...");
+
+            // Actualizar categories.yml
+            updateCategoriesYamlFile(categoryName);
+
+            // Actualizar tags.yml
+            updateTagsYamlFile(deletedTags);
+
+            plugin.getLogger().info("Archivos YAML actualizados correctamente");
+
+        } catch (Exception e) {
+            plugin.getLogger().log(Level.SEVERE, "Error al actualizar archivos YAML:", e);
+        }
+    }
+
+    /**
+     * NUEVO: Actualiza el archivo categories.yml eliminando la categoría especificada
+     */
+    private static void updateCategoriesYamlFile(String categoryName) {
+        try {
+            File categoriesFile = new File(plugin.getDataFolder(), "categories.yml");
+            if (!categoriesFile.exists()) {
+                plugin.getLogger().warning("Archivo categories.yml no encontrado, no se puede actualizar");
+                return;
+            }
+
+            YamlConfiguration categoriesConfig = YamlConfiguration.loadConfiguration(categoriesFile);
+            ConfigurationSection categoriesSection = categoriesConfig.getConfigurationSection("categories");
+
+            if (categoriesSection != null && categoriesSection.contains(categoryName)) {
+                // Eliminar la categoría del YAML
+                categoriesSection.set(categoryName, null);
+
+                // Guardar el archivo
+                categoriesConfig.save(categoriesFile);
+                plugin.getLogger().info("Categoría '" + categoryName + "' eliminada de categories.yml");
+
+            } else {
+                plugin.getLogger().info("Categoría '" + categoryName + "' no encontrada en categories.yml");
+            }
+
+        } catch (Exception e) {
+            plugin.getLogger().log(Level.SEVERE, "Error al actualizar categories.yml:", e);
+        }
+    }
+
+    /**
+     * NUEVO: Actualiza el archivo tags.yml eliminando los tags especificados
+     */
+    private static void updateTagsYamlFile(List<String> tagsToDelete) {
+        try {
+            File tagsFile = new File(plugin.getDataFolder(), "tags.yml");
+            if (!tagsFile.exists()) {
+                plugin.getLogger().warning("Archivo tags.yml no encontrado, no se puede actualizar");
+                return;
+            }
+
+            YamlConfiguration tagsConfig = YamlConfiguration.loadConfiguration(tagsFile);
+            ConfigurationSection tagsSection = tagsConfig.getConfigurationSection("tags");
+
+            if (tagsSection != null) {
+                int tagsRemoved = 0;
+
+                for (String tagName : tagsToDelete) {
+                    if (tagsSection.contains(tagName)) {
+                        // Eliminar el tag del YAML
+                        tagsSection.set(tagName, null);
+                        tagsRemoved++;
+                        plugin.getLogger().info("Tag '" + tagName + "' eliminado de tags.yml");
+                    }
+                }
+
+                if (tagsRemoved > 0) {
+                    // Guardar el archivo
+                    tagsConfig.save(tagsFile);
+                    plugin.getLogger().info("Total de tags eliminados de tags.yml: " + tagsRemoved);
+                } else {
+                    plugin.getLogger().info("No se encontraron tags para eliminar en tags.yml");
+                }
+
+            } else {
+                plugin.getLogger().warning("Sección 'tags' no encontrada en tags.yml");
+            }
+
+        } catch (Exception e) {
+            plugin.getLogger().log(Level.SEVERE, "Error al actualizar tags.yml:", e);
+        }
     }
 }

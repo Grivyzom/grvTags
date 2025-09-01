@@ -534,4 +534,23 @@ public class TagManager {
     public static List<String> getAllTagNames() {
         return new ArrayList<>(loadedTags.keySet());
     }
+
+    public static void forceReload() {
+        try {
+            plugin.getLogger().fine("Forzando recarga completa del TagManager...");
+
+            // Limpiar cache
+            loadedTags.clear();
+            lastLoadTime = 0;
+
+            // Recargar desde base de datos
+            loadAllTags();
+
+            plugin.getLogger().fine("TagManager recargado: " + loadedTags.size() + " tags cargados");
+
+        } catch (Exception e) {
+            plugin.getLogger().log(Level.SEVERE, "Error al forzar recarga del TagManager:", e);
+        }
+    }
+
 }

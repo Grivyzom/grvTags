@@ -274,7 +274,7 @@ public class AdminCommand implements CommandExecutor, TabCompleter {
             sender.sendMessage(colorize(PREFIX + "&cUso incorrecto. Sintaxis:"));
             sender.sendMessage(colorize(PREFIX + "&f/grvtags deletecategory <categoria>"));
             sender.sendMessage(colorize(PREFIX + "&7Ejemplo: &f/grvtags deletecategory premium"));
-            sender.sendMessage(colorize(PREFIX + "&c⚠ ¡Esta acción eliminará la categoría permanentemente!"));
+            sender.sendMessage(colorize(PREFIX + "&c⚠ ¡Esta acción eliminará la categoría Y TODOS SUS TAGS permanentemente!"));
             return;
         }
 
@@ -293,35 +293,9 @@ public class AdminCommand implements CommandExecutor, TabCompleter {
             return;
         }
 
-        // Verificar si la categoría tiene tags
+        // Obtener información de la categoría y sus tags
+        var category = CategoryManager.getCategory(categoryName);
         var tagsInCategory = TagManager.getTagsByCategory(categoryName);
-        if (!tagsInCategory.isEmpty()) {
-            sender.sendMessage(colorize(PREFIX + "&cNo se puede eliminar la categoría '&f" + categoryName + "&c' porque contiene tags."));
-            sender.sendMessage(colorize(""));
-            sender.sendMessage(colorize(PREFIX + "&7Tags en esta categoría (&f" + tagsInCategory.size() + "&7):"));
-
-            StringBuilder tagsList = new StringBuilder();
-            for (int i = 0; i < tagsInCategory.size(); i++) {
-                if (i > 0) tagsList.append("&7, ");
-                tagsList.append("&f").append(tagsInCategory.get(i).getName());
-
-                // Saltar línea cada 5 tags para mejor legibilidad
-                if ((i + 1) % 5 == 0 && i < tagsInCategory.size() - 1) {
-                    sender.sendMessage(colorize(PREFIX + "&7• " + tagsList));
-                    tagsList = new StringBuilder();
-                }
-            }
-
-            if (tagsList.length() > 0) {
-                sender.sendMessage(colorize(PREFIX + "&7• " + tagsList));
-            }
-
-            sender.sendMessage(colorize(""));
-            sender.sendMessage(colorize(PREFIX + "&7Debes eliminar o mover estos tags primero:"));
-            sender.sendMessage(colorize(PREFIX + "&7• Para eliminar un tag: &f/grvtags delete <tag>"));
-            sender.sendMessage(colorize(PREFIX + "&7• Para mover tags, edita el archivo tags.yml"));
-            return;
-        }
 
         // Mostrar advertencia y pedir confirmación
         if (args.length < 3 || !args[2].equalsIgnoreCase("confirm")) {
@@ -331,17 +305,35 @@ public class AdminCommand implements CommandExecutor, TabCompleter {
             sender.sendMessage(colorize(""));
             sender.sendMessage(colorize(PREFIX + "&c&lEsto hará lo siguiente:"));
             sender.sendMessage(colorize(PREFIX + "&7• Eliminará la categoría de la base de datos"));
-            sender.sendMessage(colorize(PREFIX + "&7• La categoría desaparecerá del menú principal"));
+            sender.sendMessage(colorize(PREFIX + "&7• &c&lEliminará TODOS los tags de esta categoría (" + tagsInCategory.size() + " tags)"));
+            sender.sendMessage(colorize(PREFIX + "&7• Quitará estos tags de TODOS los jugadores"));
+            sender.sendMessage(colorize(PREFIX + "&7• Jugadores con tags activos volverán al default"));
+            sender.sendMessage(colorize(PREFIX + "&7• &c&lActualizará los archivos YAML automáticamente"));
             sender.sendMessage(colorize(PREFIX + "&7• Esta acción NO se puede deshacer"));
             sender.sendMessage(colorize(""));
+
+            // Mostrar tags que se eliminarán
+            if (!tagsInCategory.isEmpty()) {
+                sender.sendMessage(colorize(PREFIX + "&c&lTags que se eliminarán:"));
+                StringBuilder tagsList = new StringBuilder();
+                for (int i = 0; i < Math.min(tagsInCategory.size(), 10); i++) {
+                    if (i > 0) tagsList.append("&7, ");
+                    tagsList.append("&f").append(tagsInCategory.get(i).getName());
+                }
+                sender.sendMessage(colorize(PREFIX + "&7• " + tagsList));
+
+                if (tagsInCategory.size() > 10) {
+                    sender.sendMessage(colorize(PREFIX + "&7• ... y " + (tagsInCategory.size() - 10) + " tags más"));
+                }
+                sender.sendMessage(colorize(""));
+            }
+
             sender.sendMessage(colorize(PREFIX + "&7Para confirmar, ejecuta:"));
             sender.sendMessage(colorize(PREFIX + "&f/grvtags deletecategory " + categoryName + " confirm"));
             return;
         }
 
         try {
-            // Obtener información de la categoría antes de eliminarla
-            var category = CategoryManager.getCategory(categoryName);
             if (category == null) {
                 sender.sendMessage(colorize(PREFIX + "&cError: Categoría no encontrada en la base de datos."));
                 return;
@@ -349,7 +341,28 @@ public class AdminCommand implements CommandExecutor, TabCompleter {
 
             sender.sendMessage(colorize(PREFIX + "&7Eliminando categoría '&f" + categoryName + "&7'..."));
 
-            // Eliminar la categoría
+            // Estadísticas antes de la eliminación
+            int totalTags = tagsInCategory.size();
+            int totalPlayersAffected = 0;
+            int totalUnlocks = 0;
+
+            // Contar jugadores afectados y desbloqueos
+            for (var tag : tagsInCategory) {
+                totalPlayersAffected += countPlayersWithActiveTag(tag.getName());
+                totalUnlocks += countTagUnlocks(tag.getName());
+            }
+
+            sender.sendMessage(colorize(PREFIX + "&7Estadísticas de la categoría:"));
+            sender.sendMessage(colorize(PREFIX + "&7• Total de tags: &f" + totalTags));
+            if (totalPlayersAffected > 0) {
+                sender.sendMessage(colorize(PREFIX + "&7• Jugadores con tags activos: &f" + totalPlayersAffected));
+            }
+            if (totalUnlocks > 0) {
+                sender.sendMessage(colorize(PREFIX + "&7• Total de desbloqueos: &f" + totalUnlocks));
+            }
+            sender.sendMessage(colorize(""));
+
+            // Eliminar la categoría (esto ahora también elimina los tags y actualiza YAML)
             if (CategoryManager.deleteCategory(categoryName)) {
                 sender.sendMessage(colorize("&8&m----------------------------------------"));
                 sender.sendMessage(colorize(PREFIX + "&a&l¡CATEGORÍA ELIMINADA EXITOSAMENTE!"));
@@ -357,13 +370,28 @@ public class AdminCommand implements CommandExecutor, TabCompleter {
                 sender.sendMessage(colorize("&7Categoría eliminada: &f" + categoryName));
                 sender.sendMessage(colorize("&7Nombre de display: " + category.getFormattedDisplayName()));
                 sender.sendMessage(colorize("&7Slot que ocupaba: &f" + category.getSlotPosition()));
+                sender.sendMessage(colorize(""));
+                sender.sendMessage(colorize("&c📊 Elementos eliminados:"));
+                sender.sendMessage(colorize("&7• &c1 &7categoría eliminada"));
+                sender.sendMessage(colorize("&7• &c" + totalTags + " &7tags eliminados"));
+                if (totalPlayersAffected > 0) {
+                    sender.sendMessage(colorize("&7• &f" + totalPlayersAffected + " &7jugadores cambiados a tag default"));
+                }
+                if (totalUnlocks > 0) {
+                    sender.sendMessage(colorize("&7• &c" + totalUnlocks + " &7desbloqueos eliminados"));
+                }
+                sender.sendMessage(colorize(""));
+                sender.sendMessage(colorize("&a✅ Archivos YAML actualizados automáticamente:"));
+                sender.sendMessage(colorize("&7• categories.yml - Categoría removida"));
+                sender.sendMessage(colorize("&7• tags.yml - Tags removidos"));
                 sender.sendMessage(colorize("&8&m----------------------------------------"));
 
-                plugin.getLogger().info("Categoría '" + categoryName + "' eliminada por " + sender.getName());
+                plugin.getLogger().info("Categoría '" + categoryName + "' eliminada por " + sender.getName() +
+                        " (eliminó " + totalTags + " tags, afectó a " + totalPlayersAffected + " jugadores)");
 
             } else {
                 sender.sendMessage(colorize(PREFIX + "&c¡Error al eliminar la categoría!"));
-                sender.sendMessage(colorize(PREFIX + "&7Verifica que la categoría no tenga tags asociados."));
+                sender.sendMessage(colorize(PREFIX + "&7Verifica los logs del servidor para más detalles."));
             }
 
         } catch (Exception e) {
@@ -373,7 +401,6 @@ public class AdminCommand implements CommandExecutor, TabCompleter {
             e.printStackTrace();
         }
     }
-
     /**
      * Autocompletado para el comando delete/deletetag
      */
@@ -1319,7 +1346,7 @@ public class AdminCommand implements CommandExecutor, TabCompleter {
         sender.sendMessage(colorize(""));
         sender.sendMessage(colorize("&c&lEliminación:"));
         sender.sendMessage(colorize("&f/grvTags delete <tag> [confirm] &8- &7Eliminar un tag"));
-        sender.sendMessage(colorize("&f/grvTags deletecategory <categoria> [confirm] &8- &7Eliminar una categoría"));
+        sender.sendMessage(colorize("&f/grvTags deletecategory <categoria> [confirm] &8- &c&lEliminar categoría + tags"));
         sender.sendMessage(colorize(""));
         sender.sendMessage(colorize("&b&lEdición:"));
         sender.sendMessage(colorize("&f/grvTags editor <type> &8- &7Abrir editores GUI"));
@@ -1333,9 +1360,10 @@ public class AdminCommand implements CommandExecutor, TabCompleter {
         sender.sendMessage(colorize(""));
         sender.sendMessage(colorize("&f/grvTags help &8- &7Muestra esta ayuda"));
         sender.sendMessage(colorize("&8&m----------------------------------------"));
-        sender.sendMessage(colorize("&e&l⚠ NUEVOS COMANDOS DE ELIMINACIÓN:"));
-        sender.sendMessage(colorize("&7• &fdelete/deletetag &7- Elimina un tag permanentemente"));
-        sender.sendMessage(colorize("&7• &fdeletecategory &7- Elimina una categoría vacía"));
+        sender.sendMessage(colorize("&e&l⚠ ELIMINACIÓN DE CATEGORÍAS:"));
+        sender.sendMessage(colorize("&7• &fdeletecategory &7- &c&lElimina categoría Y TODOS sus tags"));
+        sender.sendMessage(colorize("&7• &c&lAFECTA A JUGADORES: &7Resetea tags activos al default"));
+        sender.sendMessage(colorize("&7• &a&lACTUALIZA YAML: &7Modifica categories.yml y tags.yml"));
         sender.sendMessage(colorize("&7• Ambos requieren &fconfirm &7para evitar eliminaciones accidentales"));
         sender.sendMessage(colorize("&8&m----------------------------------------"));
     }
