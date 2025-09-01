@@ -3,7 +3,10 @@ package gc.grivyzom.managers;
 import gc.grivyzom.database.DatabaseManager;
 import gc.grivyzom.grvTags;
 import gc.grivyzom.models.Category;
+import org.bukkit.configuration.ConfigurationSection;
+import org.bukkit.configuration.file.YamlConfiguration;
 
+import java.io.File;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -365,4 +368,142 @@ public class CategoryManager {
     public static List<String> getAllCategoryNames() {
         return new ArrayList<>(loadedCategories.keySet());
     }
+
+    // Añadir estos métodos en CategoryManager.java
+
+    /**
+     * Recarga todas las categorías desde los archivos YAML y sincroniza con la base de datos
+     */
+    public static void reloadCategoriesFromYaml() {
+        try {
+            plugin.getLogger().info("Recargando categorías desde categories.yml...");
+
+            // Cargar desde YAML y sincronizar con BD
+            loadCategoriesFromYaml();
+
+            // Luego cargar desde BD para obtener los datos actualizados
+            loadAllCategories();
+
+            plugin.getLogger().info("Categorías recargadas exitosamente desde YAML");
+
+        } catch (Exception e) {
+            plugin.getLogger().log(Level.SEVERE, "Error al recargar categorías desde YAML:", e);
+        }
+    }
+
+    /**
+     * Carga categorías desde categories.yml y las sincroniza con la base de datos
+     */
+    private static void loadCategoriesFromYaml() {
+        try {
+            File categoriesFile = new File(plugin.getDataFolder(), "categories.yml");
+
+            if (!categoriesFile.exists()) {
+                plugin.saveResource("categories.yml", false);
+            }
+
+            YamlConfiguration categoriesConfig = YamlConfiguration.loadConfiguration(categoriesFile);
+            ConfigurationSection categoriesSection = categoriesConfig.getConfigurationSection("categories");
+
+            if (categoriesSection == null) {
+                plugin.getLogger().warning("No se encontró sección 'categories' en categories.yml");
+                return;
+            }
+
+            int syncedCategories = 0;
+            for (String categoryName : categoriesSection.getKeys(false)) {
+                ConfigurationSection categorySection = categoriesSection.getConfigurationSection(categoryName);
+                if (categorySection == null) continue;
+
+                String title = categorySection.getString("title", "&8" + categoryName + " Tags (Page %page%)");
+                String material = categorySection.getString("material", "NAME_TAG");
+                String displayName = categorySection.getString("id_display", "&7&l" + categoryName + " Tags");
+                int slot = categorySection.getInt("slot", 11);
+                String permission = categorySection.getString("permission", "grvtags.category." + categoryName.toLowerCase());
+                boolean permissionSeeCategory = categorySection.getBoolean("permission-see-category", false);
+
+                // Construir lore desde la lista
+                List<String> loreList = categorySection.getStringList("lore");
+                String lore = String.join("||", loreList);
+
+                // Sincronizar con base de datos
+                syncCategoryToDatabase(categoryName, title, material, displayName, slot, lore, permission, permissionSeeCategory);
+                syncedCategories++;
+            }
+
+            plugin.getLogger().info("Sincronizadas " + syncedCategories + " categorías desde categories.yml a la base de datos");
+
+        } catch (Exception e) {
+            plugin.getLogger().log(Level.SEVERE, "Error al cargar categorías desde categories.yml:", e);
+        }
+    }
+
+    /**
+     * Sincroniza una categoría con la base de datos
+     */
+    private static void syncCategoryToDatabase(String name, String title, String material,
+                                               String displayName, int slot, String lore,
+                                               String permission, boolean permissionSeeCategory) {
+        try {
+            Connection conn = DatabaseManager.getConnection();
+            if (conn == null) return;
+
+            // Verificar si la categoría ya existe
+            String checkQuery = "SELECT id FROM grvtags_categories WHERE name = ?";
+            PreparedStatement checkStmt = conn.prepareStatement(checkQuery);
+            checkStmt.setString(1, name);
+            ResultSet rs = checkStmt.executeQuery();
+
+            if (rs.next()) {
+                // Categoría existe, actualizar
+                String updateQuery = """
+                UPDATE grvtags_categories SET 
+                    title = ?, material = ?, display_name = ?, 
+                    slot_position = ?, lore = ?, permission = ?, 
+                    permission_see_category = ?, updated_at = CURRENT_TIMESTAMP
+                WHERE name = ?
+            """;
+
+                PreparedStatement updateStmt = conn.prepareStatement(updateQuery);
+                updateStmt.setString(1, title);
+                updateStmt.setString(2, material);
+                updateStmt.setString(3, displayName);
+                updateStmt.setInt(4, slot);
+                updateStmt.setString(5, lore);
+                updateStmt.setString(6, permission);
+                updateStmt.setBoolean(7, permissionSeeCategory);
+                updateStmt.setString(8, name);
+
+                updateStmt.executeUpdate();
+                updateStmt.close();
+            } else {
+                // Categoría no existe, insertar
+                String insertQuery = """
+                INSERT INTO grvtags_categories (name, title, material, display_name, 
+                                              slot_position, lore, permission, permission_see_category)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """;
+
+                PreparedStatement insertStmt = conn.prepareStatement(insertQuery);
+                insertStmt.setString(1, name);
+                insertStmt.setString(2, title);
+                insertStmt.setString(3, material);
+                insertStmt.setString(4, displayName);
+                insertStmt.setInt(5, slot);
+                insertStmt.setString(6, lore);
+                insertStmt.setString(7, permission);
+                insertStmt.setBoolean(8, permissionSeeCategory);
+
+                insertStmt.executeUpdate();
+                insertStmt.close();
+            }
+
+            rs.close();
+            checkStmt.close();
+
+        } catch (SQLException e) {
+            plugin.getLogger().log(Level.SEVERE, "Error al sincronizar categoría '" + name + "' con la base de datos:", e);
+        }
+    }
+
 }

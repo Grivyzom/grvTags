@@ -514,17 +514,24 @@ public class AdminCommand implements CommandExecutor, TabCompleter {
                 sender.sendMessage(colorize(PREFIX + "&c✗ &7Error al reinicializar la base de datos"));
             }
 
-            // Recargar tags.yml y categories.yml
-            TagManager.loadAllTags(); // Cambiado de reloadTags() a loadAllTags()
-            CategoryManager.loadAllCategories();
+            // ARREGLADO: Recargar desde archivos YAML primero, luego desde BD
+            CategoryManager.reloadCategoriesFromYaml();
+            sender.sendMessage(colorize(PREFIX + "&a✓ &7categories.yml recargado y sincronizado"));
+
+            TagManager.reloadTagsFromYaml();
+            sender.sendMessage(colorize(PREFIX + "&a✓ &7tags.yml recargado y sincronizado"));
+
+            // Recargar tag por defecto
             PlayerDataManager.reloadDefaultTag();
-            sender.sendMessage(colorize(PREFIX + "&a✓ &7Tags, categorías y datos de jugadores recargados"));
+            sender.sendMessage(colorize(PREFIX + "&a✓ &7Tag por defecto recargado"));
 
             long endTime = System.currentTimeMillis();
             long reloadTime = endTime - startTime;
 
             sender.sendMessage(colorize(PREFIX + "&a¡Recarga completada exitosamente!"));
             sender.sendMessage(colorize(PREFIX + "&7Tiempo de recarga: &f" + reloadTime + "ms"));
+            sender.sendMessage(colorize(PREFIX + "&7Tags cargados: &f" + TagManager.getTagCount()));
+            sender.sendMessage(colorize(PREFIX + "&7Categorías cargadas: &f" + CategoryManager.getCategoryCount()));
 
             plugin.getLogger().info("Configuraciones recargadas por " + sender.getName() + " (" + reloadTime + "ms)");
 
@@ -532,6 +539,7 @@ public class AdminCommand implements CommandExecutor, TabCompleter {
             sender.sendMessage(colorize(PREFIX + "&c¡Error durante la recarga!"));
             sender.sendMessage(colorize(PREFIX + "&cError: &f" + e.getMessage()));
             plugin.getLogger().severe("Error durante la recarga ejecutada por " + sender.getName() + ": " + e.getMessage());
+            e.printStackTrace();
         }
     }
 

@@ -169,6 +169,26 @@ public class TagManager {
     }
 
     /**
+     * Recarga todos los tags desde los archivos YAML y sincroniza con la base de datos
+     */
+    public static void reloadTagsFromYaml() {
+        try {
+            plugin.getLogger().info("Recargando tags desde tags.yml...");
+
+            // Recargar desde YAML y sincronizar con BD
+            loadTagsFromYaml();
+
+            // Luego cargar desde BD para obtener los datos actualizados
+            loadAllTags();
+
+            plugin.getLogger().info("Tags recargados exitosamente desde YAML");
+
+        } catch (Exception e) {
+            plugin.getLogger().log(Level.SEVERE, "Error al recargar tags desde YAML:", e);
+        }
+    }
+
+    /**
      * Obtiene un tag por su nombre
      */
     public static Tag getTag(String name) {
